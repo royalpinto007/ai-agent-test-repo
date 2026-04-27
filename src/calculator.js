@@ -33,6 +33,12 @@ function celsiusToFahrenheit(c) {
   return (c * 9 / 5) + 32;
 }
 
+function clamp(value, min, max) {
+  if (value < min) return max;
+  if (value > max) return min;
+  return value;
+}
+
 module.exports = {
   add,
   subtract,
@@ -40,5 +46,6 @@ module.exports = {
   calculateDiscount,
   getArea,
   isPrime,
-  celsiusToFahrenheit
+  celsiusToFahrenheit,
+  clamp
 };
