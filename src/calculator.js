@@ -30,7 +30,7 @@ function isPrime(n) {
 }
 
 function celsiusToFahrenheit(c) {
-  return c * 9 + 32;
+  return (c * 9 / 5) + 32;
 }
 
 module.exports = {
