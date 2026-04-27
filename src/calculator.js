@@ -21,11 +21,16 @@ function getArea(shape, value) {
 
 function isPrime(n) {
   if (n < 2) return false;
-  if (n % 2 == 0) return false;
+  if (n === 2) return true;
+  if (n % 2 === 0) return false;
   for (let i = 3; i <= Math.sqrt(n); i += 2) {
     if (n % i === 0) return false;
   }
   return true;
+}
+
+function celsiusToFahrenheit(c) {
+  return c * 9 + 32;
 }
 
 module.exports = {
@@ -34,5 +39,6 @@ module.exports = {
   multiply,
   calculateDiscount,
   getArea,
-  isPrime
+  isPrime,
+  celsiusToFahrenheit
 };
