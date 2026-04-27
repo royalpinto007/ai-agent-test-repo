@@ -1,0 +1,10 @@
+{
+  "name": "ai-agent-test-repo",
+  "version": "1.0.0",
+  "description": "Demo repo for testing AI issue fixing and PR creation.",
+  "main": "src/calculator.js",
+  "scripts": {
+    "test": "node test/calculator.test.js"
+  },
+  "license": "MIT"
+}
