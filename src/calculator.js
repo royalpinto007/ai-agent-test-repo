@@ -16,7 +16,7 @@ function calculateDiscount(price, isPremium) {
 
 function getArea(shape, value) {
   if (shape === "square") return value * value;
-  if (shape === "circle") return value * value;
+  if (shape === "circle") return Math.PI * value * value;
 }
 
 module.exports = {
