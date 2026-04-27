@@ -12,7 +12,8 @@ def run_git(args, cwd):
 
 def ask_claude(prompt):
     result = subprocess.run(
-        ["claude", "-p", prompt],
+        ["claude", "-p", "--tools", ""],
+        input=prompt,
         capture_output=True,
         text=True,
     )
