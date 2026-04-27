@@ -40,6 +40,7 @@ CURRENT CONTENT:
 
 INSTRUCTIONS:
 - Identify and fix the bug described in the issue.
+- Think through edge cases before writing the fix (e.g. boundary values, zero, negative numbers, special inputs).
 - Return ONLY the corrected file content, no explanations, no markdown fences.
 - Preserve all existing functions and exports.
 """
