@@ -11,7 +11,7 @@ function multiply(a, b) {
 }
 
 function calculateDiscount(price, isPremium) {
-  return isPremium ? price * 0.9 : price * 0.8;
+  return isPremium ? price * 0.8 : price * 0.9;
 }
 
 module.exports = {
