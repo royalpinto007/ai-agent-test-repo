@@ -40,7 +40,7 @@ function clamp(value, min, max) {
 }
 
 function power(base, exp) {
-  if (exp === 0) return 0;
+  if (exp === 0) return 1;
   return Math.pow(base, exp);
 }
 
