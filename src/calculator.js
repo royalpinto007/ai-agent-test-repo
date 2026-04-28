@@ -68,7 +68,7 @@ function absoluteDifference(a, b) {
 
 function roundTo(value, decimals) {
   const factor = Math.pow(10, decimals);
-  return Math.floor(value * factor) / factor;
+  return Math.round(value * factor) / factor;
 }
 
 module.exports = {
