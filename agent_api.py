@@ -24,7 +24,15 @@ def ask_claude(prompt):
     )
     if result.returncode != 0:
         raise RuntimeError(f"claude exited {result.returncode}: {result.stderr.strip()}")
-    return result.stdout.strip()
+    output = result.stdout.strip()
+    # Strip markdown code fences if Claude wrapped the output
+    if output.startswith("```"):
+        lines = output.splitlines()
+        lines = lines[1:]  # remove opening fence
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]  # remove closing fence
+        output = "\n".join(lines)
+    return output
 
 
 def fix_issue(issue_title, issue_body, file_path, file_content):
