@@ -272,10 +272,21 @@ def revise_agent():
         single = data.get("repo_path", DEFAULT_REPO_PATH)
         repo_paths = [single]
 
-    if not issue_number:
-        return jsonify({"status": "error", "message": "issue_number is required"}), 400
     if not human_feedback:
         return jsonify({"status": "error", "message": "human_feedback is required"}), 400
+
+    # If no issue_number provided, find it from the existing ai/fix-issue-* branch
+    if not issue_number:
+        repo_path = repo_paths[0]
+        branches = run_git(["branch", "-r"], cwd=repo_path)
+        for line in branches.splitlines():
+            branch = line.strip().replace("origin/", "")
+            if branch.startswith("ai/fix-issue-"):
+                issue_number = branch.replace("ai/fix-issue-", "")
+                break
+
+    if not issue_number:
+        return jsonify({"status": "error", "message": "Could not determine issue_number"}), 400
 
     results = []
     errors = []
