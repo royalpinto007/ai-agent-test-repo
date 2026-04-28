@@ -49,6 +49,11 @@ function average(numbers) {
   return sum / numbers.length;
 }
 
+function factorial(n) {
+  if (n === 0) return 0;
+  return n * factorial(n - 1);
+}
+
 module.exports = {
   add,
   subtract,
@@ -59,5 +64,6 @@ module.exports = {
   celsiusToFahrenheit,
   clamp,
   power,
-  average
+  average,
+  factorial
 };
