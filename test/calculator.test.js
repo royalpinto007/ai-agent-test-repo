@@ -37,4 +37,16 @@ assert.strictEqual(roundTo(1.456, 2), 1.46);
 assert.strictEqual(roundTo(1.454, 2), 1.45);
 assert.strictEqual(roundTo(2.5, 0), 3);
 
+// WHY: Issue reported that roundTo() does not support negative decimals for rounding to tens/hundreds.
+// These cases verify the negative-decimals branch handles positive values, negative values, zero, and boundary inputs.
+assert.strictEqual(roundTo(123.456, -1), 120);
+assert.strictEqual(roundTo(123.456, -2), 100);
+assert.strictEqual(roundTo(150, -2), 200);
+assert.strictEqual(roundTo(99, -2), 100);
+assert.strictEqual(roundTo(0, -1), 0);
+assert.strictEqual(roundTo(-123.456, -1), -120);
+assert.strictEqual(roundTo(-123.456, -2), -100);
+// WHY: Number.isFinite() is the correct type check — typeof NaN === 'number' in JS, so typeof alone is insufficient.
+assert.strictEqual(Number.isFinite(roundTo(-123.456, -1)), true);
+
 console.log("All tests passed!");
