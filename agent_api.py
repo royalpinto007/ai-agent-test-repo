@@ -5,6 +5,7 @@ import os
 app = Flask(__name__)
 
 DEFAULT_REPO_PATH = os.environ.get("REPO_PATH", os.path.dirname(os.path.abspath(__file__)))
+MAX_RETRIES = 3
 
 
 def run_git(args, cwd):
@@ -42,6 +43,40 @@ CURRENT CONTENT:
 INSTRUCTIONS:
 - Identify and fix ONLY the bug described in the issue. Do not refactor, rename, or improve unrelated code.
 - Think through edge cases before writing the fix (e.g. boundary values, zero, negative numbers, special inputs).
+- Do not add new functions, remove existing ones, or change function signatures.
+- Return ONLY the corrected file content, no explanations, no markdown fences.
+- Preserve all existing functions, exports, and code structure exactly.
+"""
+    return ask_claude(prompt)
+
+
+def fix_with_feedback(issue_title, issue_body, file_path, current_content, previous_fix, test_output, human_feedback=None):
+    feedback_section = f"HUMAN FEEDBACK:\n{human_feedback}\n" if human_feedback else ""
+    prompt = f"""You are a senior software engineer fixing a bug in a JavaScript file.
+
+ISSUE TITLE: {issue_title}
+ISSUE BODY:
+{issue_body}
+
+YOUR PREVIOUS ATTEMPT FAILED.
+
+PREVIOUS FIX (what you tried):
+```javascript
+{previous_fix}
+```
+
+TEST FAILURES:
+{test_output}
+
+{feedback_section}CURRENT FILE CONTENT:
+```javascript
+{current_content}
+```
+
+INSTRUCTIONS:
+- Analyze why the previous fix failed based on the test output and feedback.
+- Fix ONLY the bug described in the issue. Do not refactor, rename, or improve unrelated code.
+- Think through all edge cases carefully before writing the fix.
 - Do not add new functions, remove existing ones, or change function signatures.
 - Return ONLY the corrected file content, no explanations, no markdown fences.
 - Preserve all existing functions, exports, and code structure exactly.
@@ -97,25 +132,92 @@ def process_repo(repo_path, file_path, issue_number, issue_title, issue_body):
     with open(abs_file, "r") as f:
         original = f.read()
 
+    attempts = []
     fixed = fix_issue(issue_title, issue_body, file_path, original)
 
-    with open(abs_file, "w") as f:
-        f.write(fixed)
+    for attempt in range(1, MAX_RETRIES + 1):
+        with open(abs_file, "w") as f:
+            f.write(fixed)
+
+        test_passed, test_output = run_tests(repo_path)
+        attempts.append({
+            "attempt": attempt,
+            "fix": fixed,
+            "test_passed": test_passed,
+            "test_output": test_output,
+        })
+
+        if test_passed:
+            break
+
+        if attempt < MAX_RETRIES:
+            fixed = fix_with_feedback(issue_title, issue_body, file_path, fixed, fixed, test_output)
 
     review_output = review_fix(issue_title, issue_body, original, fixed, file_path)
-    test_passed, test_output = run_tests(repo_path)
 
     run_git(["add", file_path], cwd=repo_path)
-    run_git(["commit", "-m", f"Fix issue #{issue_number}: {issue_title}"], cwd=repo_path)
+    run_git(["commit", "-m", f"Fix issue #{issue_number}: {issue_title} (attempts: {len(attempts)})"], cwd=repo_path)
     run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
 
+    final = attempts[-1]
     return {
         "repo": repo_name,
         "repo_path": repo_path,
         "branch": branch_name,
         "review": review_output,
-        "test_passed": test_passed,
-        "test_output": test_output,
+        "test_passed": final["test_passed"],
+        "test_output": final["test_output"],
+        "attempts": len(attempts),
+        "attempt_log": attempts,
+    }
+
+
+def revise_repo(repo_path, file_path, issue_number, issue_title, issue_body, human_feedback):
+    branch_name = f"ai/fix-issue-{issue_number}"
+    abs_file = os.path.join(repo_path, file_path)
+    repo_name = os.path.basename(repo_path.rstrip("/"))
+
+    run_git(["checkout", branch_name], cwd=repo_path)
+
+    with open(abs_file, "r") as f:
+        current_content = f.read()
+
+    attempts = []
+    fixed = fix_with_feedback(issue_title, issue_body, file_path, current_content, current_content, "", human_feedback)
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        with open(abs_file, "w") as f:
+            f.write(fixed)
+
+        test_passed, test_output = run_tests(repo_path)
+        attempts.append({
+            "attempt": attempt,
+            "fix": fixed,
+            "test_passed": test_passed,
+            "test_output": test_output,
+        })
+
+        if test_passed:
+            break
+
+        if attempt < MAX_RETRIES:
+            fixed = fix_with_feedback(issue_title, issue_body, file_path, fixed, fixed, test_output, human_feedback)
+
+    review_output = review_fix(issue_title, issue_body, current_content, fixed, file_path)
+
+    run_git(["add", file_path], cwd=repo_path)
+    run_git(["commit", "-m", f"Revise fix for issue #{issue_number} based on feedback"], cwd=repo_path)
+    run_git(["push", "--force-with-lease", "origin", branch_name], cwd=repo_path)
+
+    final = attempts[-1]
+    return {
+        "repo": repo_name,
+        "repo_path": repo_path,
+        "branch": branch_name,
+        "review": review_output,
+        "test_passed": final["test_passed"],
+        "test_output": final["test_output"],
+        "attempts": len(attempts),
     }
 
 
@@ -128,7 +230,6 @@ def run_agent():
     issue_body = data.get("issue_body", "")
     file_path = data.get("file_path", "src/calculator.js")
 
-    # Accept either a list of repo_paths or a single repo_path
     repo_paths = data.get("repo_paths")
     if not repo_paths:
         single = data.get("repo_path", DEFAULT_REPO_PATH)
@@ -151,6 +252,46 @@ def run_agent():
         "status": "success" if results else "error",
         "issue_number": issue_number,
         "issue_title": issue_title,
+        "results": results,
+        "errors": errors,
+    })
+
+
+@app.route("/revise-agent", methods=["POST"])
+def revise_agent():
+    data = request.json or {}
+
+    issue_number = data.get("issue_number")
+    issue_title = data.get("issue_title", "")
+    issue_body = data.get("issue_body", "")
+    human_feedback = data.get("human_feedback", "")
+    file_path = data.get("file_path", "src/calculator.js")
+
+    repo_paths = data.get("repo_paths")
+    if not repo_paths:
+        single = data.get("repo_path", DEFAULT_REPO_PATH)
+        repo_paths = [single]
+
+    if not issue_number:
+        return jsonify({"status": "error", "message": "issue_number is required"}), 400
+    if not human_feedback:
+        return jsonify({"status": "error", "message": "human_feedback is required"}), 400
+
+    results = []
+    errors = []
+
+    for repo_path in repo_paths:
+        try:
+            result = revise_repo(repo_path, file_path, issue_number, issue_title, issue_body, human_feedback)
+            results.append(result)
+        except Exception as e:
+            errors.append({"repo_path": repo_path, "error": str(e)})
+
+    return jsonify({
+        "status": "success" if results else "error",
+        "issue_number": issue_number,
+        "issue_title": issue_title,
+        "human_feedback": human_feedback,
         "results": results,
         "errors": errors,
     })
