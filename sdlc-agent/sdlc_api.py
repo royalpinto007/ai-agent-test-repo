@@ -54,6 +54,7 @@ def pm_agent():
             session_id=sid,
             repo_path=_repo(data, session),
             brd=data.get("brd"),
+            ba_answers=data.get("ba_answers"),
         )
         return jsonify({"status": "success", "stage": "pm", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
