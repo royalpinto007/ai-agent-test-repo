@@ -1,5 +1,5 @@
 const assert = require("assert");
-const { add, subtract, multiply, calculateDiscount, getArea, isPrime, celsiusToFahrenheit, clamp, power, average, factorial, percentageOf, isEven } = require("../src/calculator");
+const { add, subtract, multiply, calculateDiscount, getArea, isPrime, celsiusToFahrenheit, clamp, power, average, factorial, percentageOf, isEven, absoluteDifference } = require("../src/calculator");
 
 assert.strictEqual(add(2, 3), 5);
 assert.strictEqual(subtract(5, 2), 3);
@@ -30,5 +30,8 @@ assert.strictEqual(percentageOf(1, 4), 25);
 assert.strictEqual(isEven(4), true);
 assert.strictEqual(isEven(3), false);
 assert.strictEqual(isEven(0), true);
+assert.strictEqual(absoluteDifference(10, 3), 7);
+assert.strictEqual(absoluteDifference(3, 10), 7);
+assert.strictEqual(absoluteDifference(5, 5), 0);
 
 console.log("All tests passed!");
