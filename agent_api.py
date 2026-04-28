@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
 import subprocess
 import os
+
 app = Flask(__name__)
 
-REPO_PATH = os.environ.get("REPO_PATH", os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_REPO_PATH = os.environ.get("REPO_PATH", os.path.dirname(os.path.abspath(__file__)))
 
 
 def run_git(args, cwd):
@@ -84,6 +85,39 @@ def run_tests(cwd):
     return passed, output
 
 
+def process_repo(repo_path, file_path, issue_number, issue_title, issue_body):
+    branch_name = f"ai/fix-issue-{issue_number}"
+    abs_file = os.path.join(repo_path, file_path)
+    repo_name = os.path.basename(repo_path.rstrip("/"))
+
+    run_git(["checkout", "main"], cwd=repo_path)
+    run_git(["pull"], cwd=repo_path)
+    run_git(["checkout", "-b", branch_name], cwd=repo_path)
+
+    with open(abs_file, "r") as f:
+        original = f.read()
+
+    fixed = fix_issue(issue_title, issue_body, file_path, original)
+
+    with open(abs_file, "w") as f:
+        f.write(fixed)
+
+    review_output = review_fix(issue_title, issue_body, original, fixed, file_path)
+    test_passed, test_output = run_tests(repo_path)
+
+    run_git(["add", file_path], cwd=repo_path)
+    run_git(["commit", "-m", f"Fix issue #{issue_number}: {issue_title}"], cwd=repo_path)
+    run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
+
+    return {
+        "repo": repo_name,
+        "repo_path": repo_path,
+        "branch": branch_name,
+        "review": review_output,
+        "test_passed": test_passed,
+        "test_output": test_output,
+    }
+
 
 @app.route("/run-agent", methods=["POST"])
 def run_agent():
@@ -92,55 +126,34 @@ def run_agent():
     issue_number = data.get("issue_number")
     issue_title = data.get("issue_title", "")
     issue_body = data.get("issue_body", "")
-    repo_path = data.get("repo_path", REPO_PATH)
     file_path = data.get("file_path", "src/calculator.js")
+
+    # Accept either a list of repo_paths or a single repo_path
+    repo_paths = data.get("repo_paths")
+    if not repo_paths:
+        single = data.get("repo_path", DEFAULT_REPO_PATH)
+        repo_paths = [single]
 
     if not issue_number:
         return jsonify({"status": "error", "message": "issue_number is required"}), 400
 
-    branch_name = f"ai/fix-issue-{issue_number}"
-    abs_file = os.path.join(repo_path, file_path)
+    results = []
+    errors = []
 
-    try:
-        # 1. Branch
-        run_git(["checkout", "main"], cwd=repo_path)
-        run_git(["pull"], cwd=repo_path)
-        run_git(["checkout", "-b", branch_name], cwd=repo_path)
+    for repo_path in repo_paths:
+        try:
+            result = process_repo(repo_path, file_path, issue_number, issue_title, issue_body)
+            results.append(result)
+        except Exception as e:
+            errors.append({"repo_path": repo_path, "error": str(e)})
 
-        with open(abs_file, "r") as f:
-            original = f.read()
-
-        # 2. Fix
-        fixed = fix_issue(issue_title, issue_body, file_path, original)
-        with open(abs_file, "w") as f:
-            f.write(fixed)
-
-        # 3. Review
-        review_output = review_fix(issue_title, issue_body, original, fixed, file_path)
-
-        # 4. Tests
-        test_passed, test_output = run_tests(repo_path)
-
-        # 5. Commit & push
-        run_git(["add", file_path], cwd=repo_path)
-        run_git(["commit", "-m", f"Fix issue #{issue_number}: {issue_title}"], cwd=repo_path)
-        run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
-
-        return jsonify({
-            "status": "success",
-            "branch": branch_name,
-            "issue_number": issue_number,
-            "issue_title": issue_title,
-            "test_passed": test_passed,
-            "test_output": test_output,
-            "review": review_output,
-        })
-
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e),
-        }), 500
+    return jsonify({
+        "status": "success" if results else "error",
+        "issue_number": issue_number,
+        "issue_title": issue_title,
+        "results": results,
+        "errors": errors,
+    })
 
 
 if __name__ == "__main__":
