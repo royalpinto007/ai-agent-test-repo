@@ -44,7 +44,8 @@ INSTRUCTIONS:
 - Identify and fix ONLY the bug described in the issue. Do not refactor, rename, or improve unrelated code.
 - Think through edge cases before writing the fix (e.g. boundary values, zero, negative numbers, special inputs).
 - Do not add new functions, remove existing ones, or change function signatures.
-- Return ONLY the corrected file content, no explanations, no markdown fences.
+- Return ONLY the corrected file content. No explanations, no markdown fences, no commentary, no preamble.
+- Your entire response must be valid JavaScript that can be written directly to a .js file.
 - Preserve all existing functions, exports, and code structure exactly.
 """
     return ask_claude(prompt)
@@ -78,7 +79,8 @@ INSTRUCTIONS:
 - Fix ONLY the bug described in the issue. Do not refactor, rename, or improve unrelated code.
 - Think through all edge cases carefully before writing the fix.
 - Do not add new functions, remove existing ones, or change function signatures.
-- Return ONLY the corrected file content, no explanations, no markdown fences.
+- Return ONLY the corrected file content. No explanations, no markdown fences, no commentary, no preamble.
+- Your entire response must be valid JavaScript that can be written directly to a .js file.
 - Preserve all existing functions, exports, and code structure exactly.
 """
     return ask_claude(prompt)
