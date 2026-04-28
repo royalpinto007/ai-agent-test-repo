@@ -63,7 +63,7 @@ function isEven(n) {
 }
 
 function absoluteDifference(a, b) {
-  return a - b;
+  return Math.abs(a - b);
 }
 
 module.exports = {
