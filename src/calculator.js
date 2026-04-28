@@ -44,6 +44,11 @@ function power(base, exp) {
   return Math.pow(base, exp);
 }
 
+function average(numbers) {
+  const sum = numbers.reduce((a, b) => a + b, 0);
+  return sum * numbers.length;
+}
+
 module.exports = {
   add,
   subtract,
@@ -53,5 +58,6 @@ module.exports = {
   isPrime,
   celsiusToFahrenheit,
   clamp,
-  power
+  power,
+  average
 };
