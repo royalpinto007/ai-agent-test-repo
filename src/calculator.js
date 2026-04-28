@@ -1,9 +1,4 @@
-Writing the clean JavaScript file now.
-
-<function_calls>
-<invoke name="Write">
-<parameter name="path">/home/royalpinto007/Open-Source/ai-agent-test-repo/src/calculator.js</parameter>
-<parameter name="content">function add(a, b) {
+function add(a, b) {
   return a + b;
 }
 
@@ -63,6 +58,10 @@ function percentageOf(value, total) {
   return (value / total) * 100;
 }
 
+function isEven(n) {
+  return n % 2 === 1;
+}
+
 module.exports = {
   add,
   subtract,
@@ -75,10 +74,6 @@ module.exports = {
   power,
   average,
   factorial,
-  percentageOf
+  percentageOf,
+  isEven
 };
-</parameter>
-</invoke>
-</function_calls>
-
-The file is now clean JavaScript. The `percentageOf` fix uses `(value / total) * 100` instead of dividing value by itself.
