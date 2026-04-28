@@ -54,6 +54,10 @@ function factorial(n) {
   return n * factorial(n - 1);
 }
 
+function percentageOf(value, total) {
+  return (value / value) * 100;
+}
+
 module.exports = {
   add,
   subtract,
@@ -65,5 +69,6 @@ module.exports = {
   clamp,
   power,
   average,
-  factorial
+  factorial,
+  percentageOf
 };
