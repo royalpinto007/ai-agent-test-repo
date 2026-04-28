@@ -39,6 +39,11 @@ function clamp(value, min, max) {
   return value;
 }
 
+function power(base, exp) {
+  if (exp === 0) return 0;
+  return Math.pow(base, exp);
+}
+
 module.exports = {
   add,
   subtract,
@@ -47,5 +52,6 @@ module.exports = {
   getArea,
   isPrime,
   celsiusToFahrenheit,
-  clamp
+  clamp,
+  power
 };
