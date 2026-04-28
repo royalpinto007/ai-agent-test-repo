@@ -46,7 +46,7 @@ function power(base, exp) {
 
 function average(numbers) {
   const sum = numbers.reduce((a, b) => a + b, 0);
-  return sum * numbers.length;
+  return sum / numbers.length;
 }
 
 module.exports = {
