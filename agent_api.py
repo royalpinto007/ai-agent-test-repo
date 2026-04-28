@@ -39,10 +39,11 @@ CURRENT CONTENT:
 ```
 
 INSTRUCTIONS:
-- Identify and fix the bug described in the issue.
+- Identify and fix ONLY the bug described in the issue. Do not refactor, rename, or improve unrelated code.
 - Think through edge cases before writing the fix (e.g. boundary values, zero, negative numbers, special inputs).
+- Do not add new functions, remove existing ones, or change function signatures.
 - Return ONLY the corrected file content, no explanations, no markdown fences.
-- Preserve all existing functions and exports.
+- Preserve all existing functions, exports, and code structure exactly.
 """
     return ask_claude(prompt)
 
