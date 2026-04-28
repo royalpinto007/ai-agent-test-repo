@@ -1,14 +1,40 @@
 from flask import Flask, request, jsonify
 import os
-import re
+import uuid
 
-from utils import ask_claude, get_file_tree, read_file, write_file, run_git, run_tests
-from prompts import ba_prompt, pm_prompt, dev_prompt, review_prompt, qa_prompt
+from utils import (
+    ask_claude, get_file_tree, read_file, write_file, run_git, run_tests,
+    identify_relevant_files, find_affected_files,
+    save_session, load_session,
+    parse_dev_output, parse_review_output, parse_qa_output,
+)
+from prompts import (
+    ba_initial_prompt, ba_followup_prompt,
+    pm_prompt,
+    dev_prompt, dev_retry_prompt,
+    review_prompt,
+    qa_prompt,
+)
 
 app = Flask(__name__)
 
-DEFAULT_REPO_PATH = os.environ.get("REPO_PATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DEFAULT_REPO_PATH = os.environ.get(
+    "REPO_PATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 MAX_RETRIES = 3
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _session_id(data):
+    sid = data.get("session_id") or str(uuid.uuid4())
+    return sid
+
+
+def _repo_path(data):
+    return data.get("repo_path", DEFAULT_REPO_PATH)
 
 
 # ---------------------------------------------------------------------------
@@ -17,23 +43,52 @@ MAX_RETRIES = 3
 
 @app.route("/ba-agent", methods=["POST"])
 def ba_agent():
+    """
+    First call:  { requirement, repo_path }
+                 → returns BRD draft + clarification questions
+                 → awaiting_approval: true if questions exist
+
+    Follow-up:   { session_id, clarification_answers }
+                 → refines BRD with answers, returns final BRD
+    """
     data = request.json or {}
-    requirement = data.get("requirement", "")
-    repo_path = data.get("repo_path", DEFAULT_REPO_PATH)
+    session_id = _session_id(data)
+    repo_path = _repo_path(data)
+
+    session = load_session(session_id) or {}
+
+    clarification_answers = data.get("clarification_answers", "")
+    requirement = data.get("requirement") or session.get("requirement", "")
 
     if not requirement:
         return jsonify({"status": "error", "message": "requirement is required"}), 400
 
-    file_tree = "\n".join(get_file_tree(repo_path))
-    brd = ask_claude(ba_prompt(requirement, file_tree))
+    file_tree_str = "\n".join(get_file_tree(repo_path))
+
+    if clarification_answers and session.get("brd_draft"):
+        # Refine BRD with answers
+        brd = ask_claude(ba_followup_prompt(requirement, session["brd_draft"], clarification_answers))
+        needs_clarification = "none" not in brd.lower().split("## clarification questions")[-1][:50].lower()
+    else:
+        # Initial BRD
+        brd = ask_claude(ba_initial_prompt(requirement, file_tree_str))
+        needs_clarification = "none" not in brd.lower().split("## clarification questions")[-1][:50].lower()
+
+    session_data = save_session(session_id, {
+        "requirement": requirement,
+        "repo_path": repo_path,
+        "brd_draft": brd,
+        "stage": "ba",
+    })
 
     return jsonify({
         "status": "success",
         "stage": "ba",
+        "session_id": session_id,
         "brd": brd,
-        "requirement": requirement,
-        "repo_path": repo_path,
+        "needs_clarification": needs_clarification,
         "awaiting_approval": True,
+        "next_stage": "ba (answer questions)" if needs_clarification else "pm",
     })
 
 
@@ -43,23 +98,38 @@ def ba_agent():
 
 @app.route("/pm-agent", methods=["POST"])
 def pm_agent():
+    """
+    { session_id }  — reads BRD from session
+    OR
+    { brd, repo_path }  — explicit BRD
+    """
     data = request.json or {}
-    brd = data.get("brd", "")
-    repo_path = data.get("repo_path", DEFAULT_REPO_PATH)
+    session_id = _session_id(data)
+    repo_path = _repo_path(data)
+
+    session = load_session(session_id) or {}
+    brd = data.get("brd") or session.get("brd_draft", "")
+    repo_path = repo_path or session.get("repo_path", DEFAULT_REPO_PATH)
 
     if not brd:
-        return jsonify({"status": "error", "message": "brd is required"}), 400
+        return jsonify({"status": "error", "message": "brd is required (pass session_id or brd)"}), 400
 
-    file_tree = "\n".join(get_file_tree(repo_path))
-    pm_output = ask_claude(pm_prompt(brd, file_tree))
+    file_tree_str = "\n".join(get_file_tree(repo_path))
+    pm_output = ask_claude(pm_prompt(brd, file_tree_str))
+
+    save_session(session_id, {
+        "pm_output": pm_output,
+        "stage": "pm",
+        "repo_path": repo_path,
+    })
 
     return jsonify({
         "status": "success",
         "stage": "pm",
+        "session_id": session_id,
         "pm_output": pm_output,
-        "brd": brd,
-        "repo_path": repo_path,
         "awaiting_approval": True,
+        "next_stage": "dev",
     })
 
 
@@ -67,60 +137,21 @@ def pm_agent():
 # Stage 3: Developer
 # ---------------------------------------------------------------------------
 
-def identify_relevant_files(issue_title, issue_description, file_tree_str):
-    prompt = f"""You are a senior developer. Given the task below and the file tree, list the files most likely to need changes.
-
-TASK: {issue_title}
-DESCRIPTION: {issue_description}
-
-FILE TREE:
-{file_tree_str}
-
-Return ONLY a JSON array of relative file paths. Example: ["src/calculator.js", "test/calculator.test.js"]
-No explanation, no markdown, just the JSON array.
-"""
-    response = ask_claude(prompt)
-    try:
-        import json
-        files = json.loads(response)
-        return [f for f in files if isinstance(f, str)]
-    except Exception:
-        return []
-
-
-def parse_dev_output(output):
-    changes = {}
-    tests = {}
-
-    file_blocks = re.findall(r'FILE:\s*(.+?)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL)
-    for path, content in file_blocks:
-        path = path.strip()
-        content = content.strip()
-        if "test" in path.lower() or "spec" in path.lower():
-            tests[path] = content
-        else:
-            changes[path] = content
-
-    impact = ""
-    impact_match = re.search(r'## Impact Analysis\n(.*?)(?=##|\Z)', output, re.DOTALL)
-    if impact_match:
-        impact = impact_match.group(1).strip()
-
-    summary = ""
-    summary_match = re.search(r'## Summary\n(.*?)(?=##|\Z)', output, re.DOTALL)
-    if summary_match:
-        summary = summary_match.group(1).strip()
-
-    return changes, tests, impact, summary
-
-
 @app.route("/dev-agent", methods=["POST"])
 def dev_agent():
+    """
+    { session_id, issue_title, issue_description }
+    OR
+    { issue_title, issue_description, repo_path }
+    """
     data = request.json or {}
+    session_id = _session_id(data)
+
+    session = load_session(session_id) or {}
+    repo_path = data.get("repo_path") or session.get("repo_path", DEFAULT_REPO_PATH)
     issue_title = data.get("issue_title", "")
     issue_description = data.get("issue_description", "")
-    repo_path = data.get("repo_path", DEFAULT_REPO_PATH)
-    branch_name = data.get("branch_name", f"ai/feature-{issue_title[:30].lower().replace(' ', '-')}")
+    branch_name = data.get("branch_name") or f"ai/feature-{session_id[:8]}"
 
     if not issue_title or not issue_description:
         return jsonify({"status": "error", "message": "issue_title and issue_description are required"}), 400
@@ -128,24 +159,31 @@ def dev_agent():
     file_tree = get_file_tree(repo_path)
     file_tree_str = "\n".join(file_tree)
 
-    relevant_files = identify_relevant_files(issue_title, issue_description, file_tree_str)
+    seed_files, affected_files = identify_relevant_files(issue_title, issue_description, repo_path, file_tree)
+
+    # Read contents of seed files (files to change) + affected (files to understand)
     file_contents = {}
-    for f in relevant_files:
+    for f in set(seed_files + affected_files):
         content = read_file(repo_path, f)
         if content:
             file_contents[f] = content
 
+    # Dev loop with retry on test failure
     attempts = []
-    dev_output = ask_claude(dev_prompt(issue_title, issue_description, file_contents, file_tree_str))
+    dev_output = ask_claude(dev_prompt(issue_title, issue_description, file_contents, affected_files, file_tree_str))
 
     for attempt in range(1, MAX_RETRIES + 1):
         changes, tests, impact, summary = parse_dev_output(dev_output)
 
-        run_git(["checkout", "main"], cwd=repo_path)
-        run_git(["pull"], cwd=repo_path)
-        if attempt == 1:
-            run_git(["checkout", "-b", branch_name], cwd=repo_path)
-        else:
+        # Set up branch
+        try:
+            run_git(["checkout", "main"], cwd=repo_path)
+            run_git(["pull"], cwd=repo_path)
+            if attempt == 1:
+                run_git(["checkout", "-b", branch_name], cwd=repo_path)
+            else:
+                run_git(["checkout", branch_name], cwd=repo_path)
+        except RuntimeError:
             run_git(["checkout", branch_name], cwd=repo_path)
 
         for path, content in {**changes, **tests}.items():
@@ -162,40 +200,48 @@ def dev_agent():
             break
 
         if attempt < MAX_RETRIES:
-            retry_prompt = f"""Your previous implementation failed tests.
+            dev_output = ask_claude(dev_retry_prompt(issue_title, dev_output, test_output, attempt))
 
-TASK: {issue_title}
-TEST FAILURES:
-{test_output}
-
-Previous output:
-{dev_output}
-
-Fix the issues and return the corrected implementation in the same format.
-"""
-            dev_output = ask_claude(retry_prompt)
-
-    for path in {**changes, **tests}.keys():
+    # Commit everything
+    all_changed = list({**changes, **tests}.keys())
+    for path in all_changed:
         run_git(["add", path], cwd=repo_path)
 
-    run_git(["commit", "-m", f"feat: {issue_title}"], cwd=repo_path)
+    final = attempts[-1]
+    commit_msg = f"feat: {issue_title} (attempts: {len(attempts)}, tests: {'pass' if final['test_passed'] else 'fail'})"
+    run_git(["commit", "-m", commit_msg], cwd=repo_path)
     run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
 
-    final = attempts[-1]
+    save_session(session_id, {
+        "branch": branch_name,
+        "issue_title": issue_title,
+        "issue_description": issue_description,
+        "impact_analysis": impact,
+        "dev_summary": summary,
+        "files_changed": list(changes.keys()),
+        "test_files": list(tests.keys()),
+        "affected_files": affected_files,
+        "test_passed": final["test_passed"],
+        "test_output": final["test_output"],
+        "dev_attempts": len(attempts),
+        "stage": "dev",
+    })
+
     return jsonify({
         "status": "success",
         "stage": "dev",
+        "session_id": session_id,
         "branch": branch_name,
         "issue_title": issue_title,
         "impact_analysis": impact,
         "summary": summary,
         "files_changed": list(changes.keys()),
-        "test_files": list(tests.keys()),
+        "affected_files": affected_files,
         "test_passed": final["test_passed"],
         "test_output": final["test_output"],
         "attempts": len(attempts),
-        "repo_path": repo_path,
         "awaiting_approval": True,
+        "next_stage": "review",
     })
 
 
@@ -205,32 +251,47 @@ Fix the issues and return the corrected implementation in the same format.
 
 @app.route("/review-agent", methods=["POST"])
 def review_agent():
+    """
+    { session_id }  — reads branch, impact, affected files from session
+    OR explicit fields
+    """
     data = request.json or {}
-    issue_title = data.get("issue_title", "")
-    branch_name = data.get("branch", "")
-    impact_analysis = data.get("impact_analysis", "")
-    test_output = data.get("test_output", "")
-    repo_path = data.get("repo_path", DEFAULT_REPO_PATH)
+    session_id = _session_id(data)
+
+    session = load_session(session_id) or {}
+    repo_path = data.get("repo_path") or session.get("repo_path", DEFAULT_REPO_PATH)
+    branch_name = data.get("branch") or session.get("branch", "")
+    issue_title = data.get("issue_title") or session.get("issue_title", "")
+    impact_analysis = data.get("impact_analysis") or session.get("impact_analysis", "")
+    affected_files = data.get("affected_files") or session.get("affected_files", [])
 
     if not branch_name:
-        return jsonify({"status": "error", "message": "branch is required"}), 400
+        return jsonify({"status": "error", "message": "branch is required (pass session_id or branch)"}), 400
 
-    diff = run_git(["diff", "main..." + branch_name], cwd=repo_path)
-    test_files_diff = run_git(["diff", "main..." + branch_name, "--", "*test*", "*spec*"], cwd=repo_path)
+    diff = run_git(["diff", f"main...{branch_name}"], cwd=repo_path)
+    test_diff = run_git(["diff", f"main...{branch_name}", "--", "*test*", "*spec*"], cwd=repo_path)
 
-    review = ask_claude(review_prompt(issue_title, diff, impact_analysis, test_files_diff))
+    review = ask_claude(review_prompt(issue_title, diff, impact_analysis, test_diff, affected_files))
+    verdict, dimensions = parse_review_output(review)
 
-    verdict = "PASS" if "PASS" in review.upper().split("## VERDICT")[-1][:20] else "FAIL"
+    save_session(session_id, {
+        "review": review,
+        "review_verdict": verdict,
+        "review_dimensions": dimensions,
+        "stage": "review",
+    })
 
     return jsonify({
         "status": "success",
         "stage": "review",
+        "session_id": session_id,
         "review": review,
         "verdict": verdict,
+        "dimensions": dimensions,
         "branch": branch_name,
         "issue_title": issue_title,
-        "repo_path": repo_path,
         "awaiting_approval": True,
+        "next_stage": "qa",
     })
 
 
@@ -240,28 +301,57 @@ def review_agent():
 
 @app.route("/qa-agent", methods=["POST"])
 def qa_agent():
+    """
+    { session_id }  — reads all prior stage data from session
+    OR explicit fields
+    """
     data = request.json or {}
-    issue_title = data.get("issue_title", "")
-    test_output = data.get("test_output", "")
-    review_verdict = data.get("verdict", "")
-    review_summary = data.get("review", "")
-    repo_path = data.get("repo_path", DEFAULT_REPO_PATH)
+    session_id = _session_id(data)
+
+    session = load_session(session_id) or {}
+    repo_path = data.get("repo_path") or session.get("repo_path", DEFAULT_REPO_PATH)
+    issue_title = data.get("issue_title") or session.get("issue_title", "")
+    test_output = data.get("test_output") or session.get("test_output", "")
+    review_verdict = data.get("verdict") or session.get("review_verdict", "")
+    review_dimensions = data.get("dimensions") or session.get("review_dimensions", {})
+    impact_analysis = data.get("impact_analysis") or session.get("impact_analysis", "")
+    review_text = data.get("review") or session.get("review", "")
 
     if not issue_title:
-        return jsonify({"status": "error", "message": "issue_title is required"}), 400
+        return jsonify({"status": "error", "message": "issue_title is required (pass session_id or issue_title)"}), 400
 
-    qa = ask_claude(qa_prompt(issue_title, test_output, review_verdict, review_summary))
+    qa = ask_claude(qa_prompt(issue_title, test_output, review_verdict, review_dimensions, impact_analysis))
+    approved, risk = parse_qa_output(qa)
 
-    approved = "APPROVED" in qa.upper().split("## QA VERDICT")[-1][:20]
+    save_session(session_id, {
+        "qa_output": qa,
+        "qa_approved": approved,
+        "qa_risk": risk,
+        "stage": "qa",
+    })
 
     return jsonify({
         "status": "success",
         "stage": "qa",
+        "session_id": session_id,
         "qa_output": qa,
         "approved": approved,
+        "risk": risk,
         "issue_title": issue_title,
-        "repo_path": repo_path,
+        "pipeline_complete": True,
     })
+
+
+# ---------------------------------------------------------------------------
+# Session status
+# ---------------------------------------------------------------------------
+
+@app.route("/session/<session_id>", methods=["GET"])
+def get_session(session_id):
+    session = load_session(session_id)
+    if not session:
+        return jsonify({"status": "error", "message": "Session not found"}), 404
+    return jsonify({"status": "success", "session": session})
 
 
 if __name__ == "__main__":
