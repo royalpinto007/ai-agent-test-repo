@@ -1,7 +1,7 @@
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, read_file, grep_repo, identify_relevant_files
+from shared.utils import get_file_tree, read_file, grep_repo, identify_relevant_files, run_git
 from shared.session import save_session, load_session
-from agents.ba.prompts import system_analysis_prompt, brd_prompt, followup_prompt
+from agents.ba.prompts import system_analysis_prompt, brd_prompt, followup_prompt, revision_prompt
 
 
 def _load_relevant_files(requirement, repo_path, file_tree):
@@ -52,12 +52,18 @@ def _has_open_questions(brd):
     return "none" not in tail and "fully specified" not in tail
 
 
-def run(session_id, requirement, repo_path, clarification_answers=None):
+def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None):
     session = load_session(session_id) or {}
     requirement = requirement or session.get("requirement", "")
 
     if not requirement:
         raise ValueError("requirement is required")
+
+    # Always pull latest before analysing so we read current code
+    try:
+        run_git(["pull"], cwd=repo_path)
+    except Exception:
+        pass  # non-fatal — continue with whatever is on disk
 
     file_tree = get_file_tree(repo_path)
     file_tree_str = "\n".join(file_tree)
@@ -69,7 +75,11 @@ def run(session_id, requirement, repo_path, clarification_answers=None):
         system_analysis = ask_claude(system_analysis_prompt(requirement, file_tree_str, file_contents))
 
     # Step 2: Generate or refine the BRD
-    if clarification_answers and session.get("brd_draft"):
+    if human_feedback and session.get("brd_draft"):
+        brd = ask_claude(revision_prompt(
+            requirement, system_analysis, session["brd_draft"], human_feedback, file_tree_str
+        ))
+    elif clarification_answers and session.get("brd_draft"):
         brd = ask_claude(followup_prompt(
             requirement, system_analysis, session["brd_draft"], clarification_answers, file_tree_str
         ))
@@ -80,9 +90,11 @@ def run(session_id, requirement, repo_path, clarification_answers=None):
 
     save_session(session_id, {
         "requirement": requirement,
+        "issue_title": requirement.split("\n")[0].strip(),
         "repo_path": repo_path,
         "system_analysis": system_analysis,
         "brd_draft": brd,
+        "needs_clarification": needs_clarification,
         "stage": "ba",
     })
 

@@ -1,0 +1,7 @@
+{
+  "royalpinto007/ai-agent-test-repo": {
+    "repo_path": "/home/royalpinto007/Open-Source/ai-agent-test-repo",
+    "test_command": ["npm", "test"],
+    "main_branch": "main"
+  }
+}

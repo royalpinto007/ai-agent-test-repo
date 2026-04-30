@@ -1,0 +1,764 @@
+{
+  "name": "SDLC - 2. Approval Gate",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sdlc-approval",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "comment-trigger",
+      "name": "GitHub Comment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400],
+      "webhookId": "sdlc-approval"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "created",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-created",
+      "name": "IF Comment Created",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('approve') }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "approve"
+            },
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('revise:') }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "revise"
+            },
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('redo-dev:') }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "redo-dev"
+            },
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('reopen:') || $json.body.comment.body.trim().toLowerCase() === 'reopen' }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "reopen"
+            },
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase() === 'skip-qa' }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "skip-qa"
+            },
+            {
+              "conditions": { "conditions": [{ "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('assign:') }}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }] },
+              "renameOutput": true,
+              "outputKey": "assign"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-action",
+      "name": "Switch: command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "options": { "allowUnauthorizedCerts": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "get-session-approve",
+      "name": "Get Session (approve)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "success",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-session-approve",
+      "name": "IF Session Found (approve)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, 180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "options": { "allowUnauthorizedCerts": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "get-session-revise",
+      "name": "Get Session (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "success",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-session-revise",
+      "name": "IF Session Found (revise)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, 360]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "options": { "allowUnauthorizedCerts": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "get-session-redo",
+      "name": "Get Session (redo-dev)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 520]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "success",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-session-redo",
+      "name": "IF Session Found (redo)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, 520]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "ba", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "sa" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "sa", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "pm" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "pm", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "dev" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "dev", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "review" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "review", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "qa" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-stage-approve",
+      "name": "Switch Stage (approve)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1280, 180]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "ba", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-ba" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "sa", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-sa" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "pm", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-pm" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "dev", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-review" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "review", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-review" },
+            { "conditions": { "conditions": [{ "leftValue": "={{ $json.session.stage }}", "rightValue": "qa", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "revise-qa" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-stage-revise",
+      "name": "Switch Stage (revise)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1280, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/sa-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": { "timeout": 300000 }
+      },
+      "id": "sa-agent",
+      "name": "SA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 40]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/pm-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": { "timeout": 300000 }
+      },
+      "id": "pm-agent",
+      "name": "PM Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 140]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/dev-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\"\n}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "dev-agent",
+      "name": "Dev Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": { "timeout": 300000 }
+      },
+      "id": "review-agent",
+      "name": "Review Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": { "timeout": 300000 }
+      },
+      "id": "qa-agent",
+      "name": "QA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 440]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "ba-revise",
+      "name": "BA Agent (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/sa-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "sa-revise",
+      "name": "SA Agent (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 660]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/pm-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "pm-revise",
+      "name": "PM Agent (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 760]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "review-revise",
+      "name": "Review Agent (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 860]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "qa-revise",
+      "name": "QA Agent (revise)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 960]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/dev-agent",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"redo_instructions\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^redo-dev:/i, '').trim()) }}\n}",
+        "options": { "timeout": 600000 }
+      },
+      "id": "dev-redo",
+      "name": "Dev Agent (redo)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 1060]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/reopen",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"reason\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^reopen:?/i, '').trim()) }}\n}",
+        "options": { "timeout": 300000 }
+      },
+      "id": "reopen-agent",
+      "name": "Reopen (BA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 1160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/skip-qa",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": { "timeout": 60000 }
+      },
+      "id": "skip-qa-agent",
+      "name": "Skip QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 1260]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/assign",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"assignee\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^assign:/i, '').trim()) }}\n}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "assign-agent",
+      "name": "Assign Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 1360]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🏗️ Solution Architect — Solution Design Document (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '⚠️ Yes — see Section 11' : '✅ None' }}\n**Next step:** Review the SDD. Comment `approve` to proceed to PM, or `revise: <feedback>` to request changes.\n\n---\n\n{{ $json.sdd }}"
+      },
+      "id": "comment-sa",
+      "name": "Comment SA Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 40]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 PM Agent — Project Plan\n\n**Dev ready:** {{ $json.dev_ready ? '✅ Yes' : '⏳ Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n{{ $json.created_issues && $json.created_issues.length > 0 ? '\\n### GitHub Issues Created\\n' + $json.created_issues.map(i => `- [#${i.issue_number} ${i.title}](${i.issue_url})`).join('\\n') : '' }}\n\n**Next step:** Review the plan, then comment `approve` to start development. You can also `revise: <feedback>` to change the task breakdown, or `assign: @username` to assign tasks.\n\n---\n\n{{ $json.pm_output }}"
+      },
+      "id": "comment-pm",
+      "name": "Comment PM Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 140]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 Dev Agent — Implementation Complete\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url }}\n**Files changed:** {{ $json.files_changed.join(', ') }}\n\n---\n\n### Summary\n{{ $json.summary }}\n\n### Impact Analysis\n{{ $json.impact_analysis }}\n\n---\n\n**Next step:** Review the code on branch `{{ $json.branch }}`, then comment `approve` to run peer review. Or `redo-dev: <instructions>` to re-run with changes."
+      },
+      "id": "comment-dev",
+      "name": "Comment Dev Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 240]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 Peer Review — {{ $json.verdict === 'PASS' ? '✅ PASS' : '❌ FAIL' }}\n\n**Blocking issues:** {{ $json.has_blocking_issues ? $json.blocking_issues.length : 'None' }}\n**Next step:** {{ $json.verdict === 'PASS' ? 'Comment `approve` to run QA sign-off. Or `revise: <feedback>` if you disagree.' : 'Developer must fix blocking issues, then comment `redo-dev: fix review issues`.' }}\n\n---\n\n{{ $json.review }}"
+      },
+      "id": "comment-review",
+      "name": "Comment Review Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 340]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 QA Sign-off — {{ $json.approved ? '✅ APPROVED' : '❌ REJECTED' }}\n\n**Risk:** {{ $json.risk }}\n**STAGE gate:** {{ $json.stage_gate }}\n**PROD gate:** {{ $json.prod_gate }}\n**Pipeline:** {{ $json.approved ? '🎉 Ready for STAGE deployment.' : '🔄 Returned for fixes.' }}\n\nYou can also `revise: <feedback>` to request changes to this QA report.\n\n---\n\n{{ $json.qa_output }}"
+      },
+      "id": "comment-qa",
+      "name": "Comment QA Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 440]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 📋 BA Agent — Revised BRD\n\n**Needs clarification:** {{ $json.needs_clarification ? '⚠️ Yes — see Section 14' : '✅ No' }}\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.brd }}"
+      },
+      "id": "comment-ba-revise",
+      "name": "Comment BA Revision",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 560]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🏗️ Solution Architect — Revised SDD (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '⚠️ Yes — see Section 11' : '✅ None' }}\n**Next step:** Comment `approve` to proceed, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.sdd }}"
+      },
+      "id": "comment-sa-revise",
+      "name": "Comment SA Revision",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 660]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 PM Agent — Revised Plan\n\n**Dev ready:** {{ $json.dev_ready ? '✅ Yes' : '⏳ Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n\n**Next step:** Comment `approve` to start development, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.pm_output }}"
+      },
+      "id": "comment-pm-revise",
+      "name": "Comment PM Revision",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 760]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 Peer Review — Revised ({{ $json.verdict === 'PASS' ? '✅ PASS' : '❌ FAIL' }})\n\n**Blocking issues:** {{ $json.has_blocking_issues ? $json.blocking_issues.length : 'None' }}\n**Next step:** {{ $json.verdict === 'PASS' ? 'Comment `approve` to run QA.' : 'Comment `redo-dev: <instructions>` to fix and re-run dev.' }}\n\n---\n\n{{ $json.review }}"
+      },
+      "id": "comment-review-revise",
+      "name": "Comment Review Revision",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 860]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 QA — Revised Report\n\n**Approved:** {{ $json.approved ? '✅ Yes' : '❌ No' }}\n**STAGE gate:** {{ $json.stage_gate }}\n**PROD gate:** {{ $json.prod_gate }}\n\n---\n\n{{ $json.qa_output }}"
+      },
+      "id": "comment-qa-revise",
+      "name": "Comment QA Revision",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 960]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🔄 Dev Agent — Re-implementation\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url }}\n\n### Summary\n{{ $json.summary }}\n\n**Next step:** Comment `approve` for peer review, or `redo-dev: <more instructions>` for another pass."
+      },
+      "id": "comment-dev-redo",
+      "name": "Comment Dev Redo",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 1060]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🔁 Pipeline Reopened — Back to BA\n\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA.\n\n---\n\n{{ $json.brd }}"
+      },
+      "id": "comment-reopen",
+      "name": "Comment Reopen",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 1160]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## ✅ QA Skipped — Manually Approved\n\n**STAGE gate:** OPEN\n**PROD gate:** BLOCKED (verify on STAGE first)\n**Pipeline:** Ready for STAGE deployment.\n\n{{ $json.qa_output }}"
+      },
+      "id": "comment-skip-qa",
+      "name": "Comment Skip QA",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 1260]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 👤 Issues Assigned\n\n**Assignee:** @{{ $json.assignee }}\n**Issues assigned:** {{ $json.results.filter(r => r.assigned).length }} / {{ $json.results.length }}\n\n{{ $json.results.map(r => r.assigned ? `- ✅ #${r.issue} assigned` : `- ❌ #${r.issue} failed: ${r.error}`).join('\\n') }}"
+      },
+      "id": "comment-assign",
+      "name": "Comment Assign",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1680, 1360]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## ⚠️ SDLC Pipeline — Session not found\n\nCould not find session `{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}`. Make sure the pipeline was started by opening the issue first."
+      },
+      "id": "comment-no-session",
+      "name": "Comment No Session",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [1160, 1460]
+    }
+  ],
+  "connections": {
+    "GitHub Comment Webhook": {
+      "main": [[{ "node": "IF Comment Created", "type": "main", "index": 0 }]]
+    },
+    "IF Comment Created": {
+      "main": [
+        [{ "node": "Switch: command", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Switch: command": {
+      "main": [
+        [{ "node": "Get Session (approve)", "type": "main", "index": 0 }],
+        [{ "node": "Get Session (revise)", "type": "main", "index": 0 }],
+        [{ "node": "Get Session (redo-dev)", "type": "main", "index": 0 }],
+        [{ "node": "Reopen (BA)", "type": "main", "index": 0 }],
+        [{ "node": "Skip QA", "type": "main", "index": 0 }],
+        [{ "node": "Assign Issues", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Session (approve)": {
+      "main": [[{ "node": "IF Session Found (approve)", "type": "main", "index": 0 }]]
+    },
+    "IF Session Found (approve)": {
+      "main": [
+        [{ "node": "Switch Stage (approve)", "type": "main", "index": 0 }],
+        [{ "node": "Comment No Session", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Session (revise)": {
+      "main": [[{ "node": "IF Session Found (revise)", "type": "main", "index": 0 }]]
+    },
+    "IF Session Found (revise)": {
+      "main": [
+        [{ "node": "Switch Stage (revise)", "type": "main", "index": 0 }],
+        [{ "node": "Comment No Session", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Session (redo-dev)": {
+      "main": [[{ "node": "IF Session Found (redo)", "type": "main", "index": 0 }]]
+    },
+    "IF Session Found (redo)": {
+      "main": [
+        [{ "node": "Dev Agent (redo)", "type": "main", "index": 0 }],
+        [{ "node": "Comment No Session", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch Stage (approve)": {
+      "main": [
+        [{ "node": "SA Agent", "type": "main", "index": 0 }],
+        [{ "node": "PM Agent", "type": "main", "index": 0 }],
+        [{ "node": "Dev Agent", "type": "main", "index": 0 }],
+        [{ "node": "Review Agent", "type": "main", "index": 0 }],
+        [{ "node": "QA Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch Stage (revise)": {
+      "main": [
+        [{ "node": "BA Agent (revise)", "type": "main", "index": 0 }],
+        [{ "node": "SA Agent (revise)", "type": "main", "index": 0 }],
+        [{ "node": "PM Agent (revise)", "type": "main", "index": 0 }],
+        [{ "node": "Review Agent (revise)", "type": "main", "index": 0 }],
+        [{ "node": "Review Agent (revise)", "type": "main", "index": 0 }],
+        [{ "node": "QA Agent (revise)", "type": "main", "index": 0 }]
+      ]
+    },
+    "SA Agent": { "main": [[{ "node": "Comment SA Result", "type": "main", "index": 0 }]] },
+    "PM Agent": { "main": [[{ "node": "Comment PM Result", "type": "main", "index": 0 }]] },
+    "Dev Agent": { "main": [[{ "node": "Comment Dev Result", "type": "main", "index": 0 }]] },
+    "Review Agent": { "main": [[{ "node": "Comment Review Result", "type": "main", "index": 0 }]] },
+    "QA Agent": { "main": [[{ "node": "Comment QA Result", "type": "main", "index": 0 }]] },
+    "BA Agent (revise)": { "main": [[{ "node": "Comment BA Revision", "type": "main", "index": 0 }]] },
+    "SA Agent (revise)": { "main": [[{ "node": "Comment SA Revision", "type": "main", "index": 0 }]] },
+    "PM Agent (revise)": { "main": [[{ "node": "Comment PM Revision", "type": "main", "index": 0 }]] },
+    "Review Agent (revise)": { "main": [[{ "node": "Comment Review Revision", "type": "main", "index": 0 }]] },
+    "QA Agent (revise)": { "main": [[{ "node": "Comment QA Revision", "type": "main", "index": 0 }]] },
+    "Dev Agent (redo)": { "main": [[{ "node": "Comment Dev Redo", "type": "main", "index": 0 }]] },
+    "Reopen (BA)": { "main": [[{ "node": "Comment Reopen", "type": "main", "index": 0 }]] },
+    "Skip QA": { "main": [[{ "node": "Comment Skip QA", "type": "main", "index": 0 }]] },
+    "Assign Issues": { "main": [[{ "node": "Comment Assign", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "sdlc" }]
+}
