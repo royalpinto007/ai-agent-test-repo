@@ -1,12 +1,22 @@
+function assertNumeric(label, v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new TypeError(label + ' must be a finite numeric value, got ' + (typeof v === 'number' ? v : typeof v));
+}
+
 function add(a, b) {
+  assertNumeric('add: a', a);
+  assertNumeric('add: b', b);
   return a + b;
 }
 
 function subtract(a, b) {
+  assertNumeric('subtract: a', a);
+  assertNumeric('subtract: b', b);
   return a - b;
 }
 
 function multiply(a, b) {
+  assertNumeric('multiply: a', a);
+  assertNumeric('multiply: b', b);
   return a * b;
 }
 
@@ -39,7 +49,10 @@ function clamp(value, min, max) {
   return value;
 }
 
+// typeof alone cannot detect NaN (typeof NaN === 'number'), so Number.isFinite is required
 function power(base, exp) {
+  assertNumeric('power: base', base);
+  assertNumeric('power: exp', exp);
   if (exp === 0) return 1;
   return Math.pow(base, exp);
 }
@@ -49,7 +62,11 @@ function average(numbers) {
   return sum / numbers.length;
 }
 
+// factorial(-1) causes infinite recursion; guards are ordered type → integer → sign
 function factorial(n) {
+  if (typeof n !== 'number' || !Number.isFinite(n)) throw new TypeError('factorial: n must be a finite number, got ' + typeof n);
+  if (!Number.isInteger(n)) throw new RangeError('factorial: n must be an integer, got ' + n);
+  if (n < 0) throw new RangeError('factorial: n must be non-negative, got ' + n);
   if (n === 0) return 1;
   return n * factorial(n - 1);
 }
@@ -75,6 +92,13 @@ function roundTo(value, decimals) {
   return Math.round(value * factor) / factor;
 }
 
+function divide(dividend, divisor) {
+  assertNumeric('divide: dividend', dividend);
+  assertNumeric('divide: divisor', divisor);
+  if (divisor === 0) throw new RangeError('divide: divisor must not be zero');
+  return dividend / divisor;
+}
+
 module.exports = {
   add,
   subtract,
@@ -90,5 +114,6 @@ module.exports = {
   percentageOf,
   isEven,
   absoluteDifference,
-  roundTo
+  roundTo,
+  divide
 };
