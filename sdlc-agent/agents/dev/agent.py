@@ -40,10 +40,10 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
     if not branch_name:
-        # Build branch name from issue number + title slug
         issue_number = session_id.split("-")[-1] if "-" in session_id else session_id
-        slug = re.sub(r'[^a-z0-9]+', '-', issue_title.lower())[:40].strip('-')
-        branch_name = f"ai/issue-{issue_number}-{slug}"
+        slug = re.sub(r'[^a-z0-9]+', '-', issue_title.lower()).strip('-')
+        slug = '-'.join(slug.split('-')[:4])  # max 4 words
+        branch_name = f"ai/{issue_number}-{slug}"
     test_command = test_command or session.get("test_command")
     pm_tasks = session.get("pm_output", "")
 
