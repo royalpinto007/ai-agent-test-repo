@@ -1,5 +1,10 @@
-def brd_review_prompt(brd, system_analysis, file_tree, sdd=""):
+def brd_review_prompt(brd, system_analysis, file_tree, sdd="", other_repos=None):
     sdd_section = f"\nSOLUTION DESIGN:\n{sdd}" if sdd else ""
+    other_repos_section = ""
+    if other_repos:
+        repos_list = "\n".join(f"- {r}" for r in other_repos)
+        other_repos_section = f"\nOTHER REGISTERED REPOS (that could be affected):\n{repos_list}\n"
+
     return f"""You're the PM reviewing this before dev starts. Make sure the work is well-scoped and a developer has everything they need.
 
 Scale your output to the size of the change. One small task = short review. Multiple features = more detail. Don't pad.
@@ -13,7 +18,7 @@ REQUIREMENTS:
 
 FILE TREE:
 {file_tree}
-
+{other_repos_section}
 ---
 
 **Requirements check**
@@ -34,6 +39,17 @@ For each task:
 - **Complexity:** Low / Medium / High
 - **Risk:** Low / Medium / High
 - **Priority:** P1 (must have) / P2 (should have) / P3 (nice to have)
+
+**Cross-repo impact** *(only fill this in if the change genuinely requires code changes in another registered repo)*
+For each affected repo:
+
+### Cross-repo: <owner/repo>
+- **What needs to change:** Specific description of what must change in that repo
+- **Why:** Why this repo is affected — what dependency or integration requires the change
+- **Suggested issue title:** A clear one-line title for the issue to open in that repo
+- **Suggested issue body:** Full description with acceptance criteria for that repo's issue
+
+If no other repos are affected: "None — changes are contained to this repo."
 
 **Questions for the BA** *(only if something would actually block a dev from starting)*
 If none: "None — ready to go."

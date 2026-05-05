@@ -3,5 +3,10 @@
     "repo_path": "/home/royalpinto007/Open-Source/ai-agent-test-repo",
     "test_command": ["npm", "test"],
     "main_branch": "main"
+  },
+  "royalpinto007/dreamchain-cli": {
+    "repo_path": "/home/royalpinto007/dreamchain-cli",
+    "test_command": ["npm", "run", "build"],
+    "main_branch": "main"
   }
 }

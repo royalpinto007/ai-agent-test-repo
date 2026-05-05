@@ -1,8 +1,10 @@
 import re
 import os
+import subprocess
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, create_github_issue
 from shared.session import save_session, load_session
+from shared.config import all_repos
 from agents.pm.prompts import brd_review_prompt, questions_followup_prompt, revision_prompt as pm_revision_prompt
 
 
@@ -155,6 +157,68 @@ def _create_issues_for_tasks(tasks, repo_path, parent_session_id):
     return created, None
 
 
+def _parse_cross_repo_tasks(pm_output):
+    """Extract cross-repo tasks from PM output Cross-repo impact section."""
+    cross_repo = []
+    # Find cross-repo section
+    section_match = re.search(r'\*\*Cross-repo impact\*\*(.+?)(?=\*\*Questions for the BA\*\*|\*\*PM Recommendation\*\*|## 10\.|$)', pm_output, re.DOTALL | re.IGNORECASE)
+    if not section_match:
+        return cross_repo
+
+    body = section_match.group(1)
+    if re.search(r'none\s*[—–-]\s*changes are contained', body, re.IGNORECASE):
+        return cross_repo
+
+    blocks = re.split(r'###\s+Cross-repo:\s*', body)
+    for block in blocks[1:]:
+        lines = block.strip().split("\n")
+        repo_slug = lines[0].strip()  # owner/repo
+        if not repo_slug or "/" not in repo_slug:
+            continue
+
+        def _field(pattern, default=""):
+            m = re.search(pattern, block, re.IGNORECASE | re.DOTALL)
+            return m.group(1).strip() if m else default
+
+        what = _field(r'\*\*What needs to change:\*\*\s*(.+?)(?=\*\*|$)')
+        why = _field(r'\*\*Why:\*\*\s*(.+?)(?=\*\*|$)')
+        issue_title = _field(r'\*\*Suggested issue title:\*\*\s*(.+?)(?=\*\*|$)')
+        issue_body = _field(r'\*\*Suggested issue body:\*\*\s*(.+?)(?=###|$)')
+
+        cross_repo.append({
+            "repo": repo_slug,
+            "what": what,
+            "why": why,
+            "issue_title": issue_title or f"Cross-repo impact from {repo_slug}",
+            "issue_body": issue_body or f"**What needs to change:** {what}\n\n**Why:** {why}",
+        })
+
+    return cross_repo
+
+
+def _create_cross_repo_issues(cross_repo_tasks, token, parent_issue_url, parent_session_id):
+    created = []
+    for task in cross_repo_tasks:
+        parts = task["repo"].split("/")
+        if len(parts) != 2:
+            created.append({**task, "error": f"invalid repo slug: {task['repo']}"})
+            continue
+        owner, repo = parts
+
+        body = f"""{task['issue_body']}
+
+---
+*Cross-repo impact detected by PM Agent. Parent issue: {parent_issue_url} (session: `{parent_session_id}`)*
+"""
+        try:
+            issue = create_github_issue(owner, repo, token, task["issue_title"], body, [])
+            created.append({**task, "issue_number": issue["number"], "issue_url": issue["url"]})
+        except RuntimeError as e:
+            created.append({**task, "error": str(e)})
+
+    return created
+
+
 def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=None):
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
@@ -167,6 +231,14 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
     file_tree_str = "\n".join(get_file_tree(repo_path))
     sdd = session.get("sdd", "")
 
+    # Build list of other registered repos (exclude current one)
+    current_owner_repo = session_id.rsplit("-", 1)[0].replace("-", "/", 1) if "-" in session_id else ""
+    try:
+        registered = all_repos()
+        other_repos = [slug for slug in registered if slug != current_owner_repo]
+    except Exception:
+        other_repos = []
+
     if human_feedback and session.get("pm_output"):
         pm_output = ask_claude(pm_revision_prompt(
             brd, session["pm_output"], human_feedback, file_tree_str
@@ -176,24 +248,41 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
             brd, session["pm_output"], ba_answers, file_tree_str
         ))
     else:
-        pm_output = ask_claude(brd_review_prompt(brd, system_analysis, file_tree_str, sdd))
+        pm_output = ask_claude(brd_review_prompt(brd, system_analysis, file_tree_str, sdd, other_repos=other_repos or None))
 
     has_blocking = _has_blocking_questions(pm_output)
     dev_ready = _is_ready_for_dev(pm_output)
 
+    token = os.environ.get("GITHUB_TOKEN", "")
+
+    # Derive parent issue URL
+    parent_issue_url = session.get("issue_url", "")
+    if not parent_issue_url:
+        parts = session_id.rsplit("-", 1)
+        if len(parts) == 2:
+            owner_repo, issue_num = parts[0].replace("-", "/", 1), parts[1]
+            parent_issue_url = f"https://github.com/{owner_repo}/issues/{issue_num}"
+
     # Create GitHub issues for each task when dev-ready
     created_issues = []
     issues_error = None
+    cross_repo_issues = []
     if dev_ready and not has_blocking:
         tasks = _parse_tasks(pm_output)
         if tasks:
             created_issues, issues_error = _create_issues_for_tasks(tasks, repo_path, session_id)
+
+        if token and other_repos:
+            cross_repo_tasks = _parse_cross_repo_tasks(pm_output)
+            if cross_repo_tasks:
+                cross_repo_issues = _create_cross_repo_issues(cross_repo_tasks, token, parent_issue_url, session_id)
 
     save_session(session_id, {
         "pm_output": pm_output,
         "pm_has_blocking_questions": has_blocking,
         "pm_dev_ready": dev_ready,
         "pm_tasks": created_issues,
+        "cross_repo_issues": cross_repo_issues,
         "repo_path": repo_path,
         "stage": "pm",
     })
@@ -204,5 +293,6 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "dev_ready": dev_ready,
         "created_issues": created_issues,
         "issues_error": issues_error,
+        "cross_repo_issues": cross_repo_issues,
         "next_stage": "pm (answer questions)" if has_blocking else "dev",
     }
