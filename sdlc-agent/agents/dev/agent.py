@@ -39,7 +39,11 @@ def parse_output(output):
 def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None):
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
-    branch_name = branch_name or f"ai/feature-{session_id[:8]}"
+    if not branch_name:
+        # Build branch name from issue number + title slug
+        issue_number = session_id.split("-")[-1] if "-" in session_id else session_id
+        slug = re.sub(r'[^a-z0-9]+', '-', issue_title.lower())[:40].strip('-')
+        branch_name = f"ai/issue-{issue_number}-{slug}"
     test_command = test_command or session.get("test_command")
     pm_tasks = session.get("pm_output", "")
 
@@ -110,12 +114,13 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         raise RuntimeError(f"git commit -m feat: {issue_title} failed: {commit_result.stderr.strip()}")
     run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
 
-    # Extract issue number from session_id (format: sdlc-{issue_number})
-    issue_number = session_id.replace("sdlc-", "") if session_id.startswith("sdlc-") else None
+    issue_number = session_id.split("-")[-1] if "-" in session_id else None
+    pr_url = None
+    pr_error = None
     try:
         pr_url = create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description, summary)
     except RuntimeError as e:
-        pr_url = f"PR creation failed: {e}"
+        pr_error = str(e)
 
     result = {
         "branch": branch_name,
@@ -131,6 +136,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         "test_output": final["test_output"],
         "attempts": len(attempts),
         "pr_url": pr_url,
+        "pr_error": pr_error,
         "next_stage": "review",
     }
 

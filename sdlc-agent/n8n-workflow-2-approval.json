@@ -488,7 +488,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 Dev Agent — Implementation Complete\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url }}\n**Files changed:** {{ $json.files_changed.join(', ') }}\n\n---\n\n### Summary\n{{ $json.summary }}\n\n### Impact Analysis\n{{ $json.impact_analysis }}\n\n---\n\n**Next step:** Review the code on branch `{{ $json.branch }}`, then comment `approve` to run peer review. Or `redo-dev: <instructions>` to re-run with changes."
+        "body": "=## 🤖 Dev Agent — Implementation Complete\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url ? $json.pr_url : ('⚠️ PR creation failed: ' + $json.pr_error + '\\n\\nCreate it manually: `git checkout ' + $json.branch + ' && gh pr create` or open a PR from the branch on GitHub.') }}\n**Files changed:** {{ $json.files_changed.join(', ') }}\n\n---\n\n### Summary\n{{ $json.summary }}\n\n---\n\n**Next step:** Review the code on branch `{{ $json.branch }}`, then comment `approve` to run peer review. Or `redo-dev: <instructions>` to re-run with changes."
       },
       "id": "comment-dev",
       "name": "Comment Dev Result",
