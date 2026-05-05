@@ -101,7 +101,6 @@ Add:
 
 ```
 GITHUB_TOKEN=your_token_here
-ANTHROPIC_API_KEY=your_key_here
 ```
 
 Set permissions so only root can read it:
