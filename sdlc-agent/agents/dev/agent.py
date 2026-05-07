@@ -36,7 +36,7 @@ def parse_output(output):
     return changes, tests, impact, pr_description, summary
 
 
-def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None):
+def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None, main_branch="main"):
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
     if not branch_name:
@@ -80,7 +80,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         changes, tests, impact, pr_description, summary = parse_output(output)
 
         try:
-            run_git(["checkout", "main"], cwd=repo_path)
+            run_git(["checkout", main_branch], cwd=repo_path)
             run_git(["pull"], cwd=repo_path)
             if attempt == 1:
                 run_git(["checkout", "-b", branch_name], cwd=repo_path)
@@ -141,7 +141,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     pr_url = None
     pr_error = None
     try:
-        pr_url = create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description, summary)
+        pr_url = create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description, summary, main_branch)
     except RuntimeError as e:
         pr_error = str(e)
 
@@ -169,5 +169,5 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         "next_stage": "review",
     }
 
-    save_session(session_id, {**result, "stage": "dev", "repo_path": repo_path, "dev_raw_output": output})
+    save_session(session_id, {**result, "stage": "dev", "repo_path": repo_path, "dev_raw_output": output, "main_branch": main_branch})
     return result

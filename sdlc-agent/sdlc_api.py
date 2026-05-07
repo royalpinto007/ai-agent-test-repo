@@ -149,7 +149,7 @@ def dev_agent():
     data = request.json or {}
     sid = _sid(data)
     session = load_session(sid) or {}
-    repo_path, test_command, _ = _repo_config(data, session)
+    repo_path, test_command, main_branch = _repo_config(data, session)
     requirement = session.get("requirement", "")
     try:
         result = dev.run(
@@ -160,6 +160,7 @@ def dev_agent():
             branch_name=data.get("branch_name"),
             redo_instructions=data.get("redo_instructions"),
             test_command=test_command,
+            main_branch=main_branch,
         )
         return jsonify({"status": "success", "stage": "dev", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
@@ -171,7 +172,7 @@ def review_agent():
     data = request.json or {}
     sid = _sid(data)
     session = load_session(sid) or {}
-    repo_path, _, _ = _repo_config(data, session)
+    repo_path, _, main_branch = _repo_config(data, session)
     try:
         result = review.run(
             session_id=sid,
@@ -181,6 +182,7 @@ def review_agent():
             impact_analysis=data.get("impact_analysis"),
             affected_files=data.get("affected_files"),
             human_feedback=data.get("human_feedback"),
+            main_branch=main_branch,
         )
         return jsonify({"status": "success", "stage": "review", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:

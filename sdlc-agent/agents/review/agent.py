@@ -53,13 +53,14 @@ def parse_output(output):
 
 
 def run(session_id, repo_path=None, branch_name=None, issue_title=None,
-        impact_analysis=None, affected_files=None, human_feedback=None):
+        impact_analysis=None, affected_files=None, human_feedback=None, main_branch=None):
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
     branch_name = branch_name or session.get("branch", "")
     issue_title = issue_title or session.get("issue_title") or session.get("requirement", "").split("\n")[0].strip()
     impact_analysis = impact_analysis or session.get("impact_analysis", "")
     affected_files = affected_files or session.get("affected_files", [])
+    main_branch = main_branch or session.get("main_branch", "main")
     codebase_analysis = session.get("codebase_analysis", "")
     pr_description = session.get("pr_description", "")
 
@@ -69,10 +70,10 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
     # Rebase onto current main so the review reflects the real merge state
     rebase_conflict = None
     try:
-        run_git(["fetch", "origin", "main"], cwd=repo_path)
+        run_git(["fetch", "origin", main_branch], cwd=repo_path)
         run_git(["checkout", branch_name], cwd=repo_path)
         rebase_result = subprocess.run(
-            ["git", "rebase", "origin/main"],
+            ["git", "rebase", f"origin/{main_branch}"],
             cwd=repo_path, capture_output=True, text=True
         )
         if rebase_result.returncode != 0:
@@ -92,7 +93,7 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
 
     if rebase_conflict:
         result = {
-            "review": "Rebase failed — branch has conflicts with main.",
+            "review": f"Rebase failed — branch has conflicts with {main_branch}.",
             "verdict": "FAIL",
             "dimensions": {},
             "blocking_issues": rebase_conflict["files"],
@@ -105,8 +106,8 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
         save_session(session_id, {**result, "review_verdict": "FAIL", "stage": "review"})
         return result
 
-    diff = run_git(["diff", f"origin/main...{branch_name}"], cwd=repo_path)
-    test_diff = run_git(["diff", f"origin/main...{branch_name}", "--", "*test*", "*spec*"], cwd=repo_path)
+    diff = run_git(["diff", f"origin/{main_branch}...{branch_name}"], cwd=repo_path)
+    test_diff = run_git(["diff", f"origin/{main_branch}...{branch_name}", "--", "*test*", "*spec*"], cwd=repo_path)
 
     # If this is a re-review after human feedback or developer revisions
     original_review = session.get("review", "")

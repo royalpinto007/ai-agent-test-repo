@@ -123,7 +123,7 @@ def find_affected_files(repo_path, seed_files, file_tree):
     return sorted(affected)
 
 
-def create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description="", summary=""):
+def create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description="", summary="", base_branch="main"):
     import urllib.request
     import urllib.error
 
@@ -148,7 +148,7 @@ def create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_de
     payload = json.dumps({
         "title": issue_title,
         "body": body.strip(),
-        "base": "main",
+        "base": base_branch,
         "head": branch_name,
     }).encode()
 
