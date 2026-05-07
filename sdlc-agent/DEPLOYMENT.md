@@ -101,7 +101,10 @@ Add:
 
 ```
 GITHUB_TOKEN=your_token_here
+WEBHOOK_SECRET=your_webhook_secret_here
 ```
+
+`WEBHOOK_SECRET` is optional but strongly recommended. Generate one with `openssl rand -hex 32` and use the same value in both this file and the GitHub webhook settings (step 9).
 
 Set permissions so only root can read it:
 
@@ -290,7 +293,7 @@ In each repo you want the pipeline to watch:
 |-------|-------|
 | Payload URL | `https://your-domain.com/webhook/sdlc-start` |
 | Content type | `application/json` |
-| Secret | leave blank |
+| Secret | the value of `WEBHOOK_SECRET` from step 4 |
 | Events | Issues, Issue comments |
 
 For multiple repos: add the same webhook URL to each one. The pipeline reads the owner and repo name from the payload automatically.

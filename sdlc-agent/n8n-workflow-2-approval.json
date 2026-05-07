@@ -144,6 +144,22 @@
               },
               "renameOutput": true,
               "outputKey": "assign"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.comment.body.trim().toLowerCase().startsWith('status') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "status"
             }
           ]
         },
@@ -952,7 +968,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## \ud83e\udd16 Dev Agent \u2014 Implementation Complete\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url ? $json.pr_url : ('\u26a0\ufe0f PR creation failed: ' + $json.pr_error + '\\n\\nCreate it manually: `git checkout ' + $json.branch + ' && gh pr create` or open a PR from the branch on GitHub.') }}\n**Files changed:** {{ $json.files_changed.join(', ') }}\n\n---\n\n### Summary\n{{ $json.summary }}\n\n---\n\n**Next step:** Review the code on branch `{{ $json.branch }}`, then comment `approve` to run peer review. Or `redo-dev: <instructions>` to re-run with changes."
+        "body": "=## \ud83d\udcbb Dev Agent \u2014 Implementation {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.test_passed ? '' : '\\n> \u26a0\ufe0f Tests failed after all retries. Use `redo-dev: <instructions>` to fix, or push a manual fix to the branch.\\n' }}{{ $json.pr_url ? '**PR:** ' + $json.pr_url : ($json.pr_error ? '**PR:** \u274c ' + $json.pr_error + '\\n\\nTo create the PR manually:\\n```\\ncurl -X POST http://localhost:5001/create-pr -H \"Content-Type: application/json\" -d \\'{\"session_id\": \"{{ $json.session_id || $(\\'GitHub Comment Webhook\\').item.json.body.repository.owner.login + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.repository.name + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.issue.number }}\"}\\'\\n```' : '') }}\n\n{{ $json.test_passed ? '**Next step:** Comment `approve` to start peer review.' : '**Next step:** Fix the test failures, then comment `redo-dev: <what you fixed>` to re-run.' }}"
       },
       "id": "comment-dev",
       "name": "Comment Dev Result",
@@ -1178,6 +1194,71 @@
         1160,
         1460
       ]
+    },
+    {
+      "id": "status-request-001",
+      "name": "Get Pipeline Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        850,
+        700
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/status",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "status-comment-001",
+      "name": "Comment Status",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        700
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "={{ $json.status === 'success' ? $json.summary : '\u274c Could not retrieve status: ' + $json.message }}"
+      },
+      "credentials": {}
+    },
+    {
+      "id": "verify-sig-001",
+      "name": "Verify Webhook Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.WEBHOOK_SECRET || '';\nif (!secret) return [{json: $input.item.json}]; // skip if no secret configured\n\nconst sig = $input.item.json.headers?.['x-hub-signature-256'] || '';\nconst body = JSON.stringify($input.item.json.body);\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nif (sig !== expected) {\n  throw new Error('Invalid webhook signature \u2014 request rejected');\n}\nreturn [{json: $input.item.json}];"
+      }
     }
   ],
   "connections": {
@@ -1244,6 +1325,13 @@
         [
           {
             "node": "Assign Issues",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Pipeline Status",
             "type": "main",
             "index": 0
           }
@@ -1570,6 +1658,17 @@
         [
           {
             "node": "Comment Assign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pipeline Status": {
+      "main": [
+        [
+          {
+            "node": "Comment Status",
             "type": "main",
             "index": 0
           }

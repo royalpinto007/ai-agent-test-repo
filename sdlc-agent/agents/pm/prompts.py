@@ -25,31 +25,42 @@ FILE TREE:
 Are the requirements clear and complete? Flag anything ambiguous, missing, or contradictory. If everything looks solid, one line is fine.
 
 **Task breakdown**
-Break the work into tasks a single developer can pick up.
+Break the work into tasks a single developer can pick up. Write your analysis in plain text, then emit a single JSON block at the end of this section.
 
-For each task:
-
-### Task [N]: <title>
-- **Type:** Bug Fix / Enhancement / New Feature / Refactor / Test
-- **Description:** What to build, specific enough that a dev doesn't need to ask questions
-- **Acceptance Criteria:** The conditions this task must satisfy
-- **Affected Files:** Best guess from the file tree
-- **Depends On:** Task numbers, or "None"
-- **Effort Estimate:** XS (<1h) / S (1-4h) / M (half day) / L (1 day) / XL (2+ days)
-- **Complexity:** Low / Medium / High
-- **Risk:** Low / Medium / High
-- **Priority:** P1 (must have) / P2 (should have) / P3 (nice to have)
+```json
+[
+  {
+    "title": "Short imperative title",
+    "type": "Bug Fix | Enhancement | New Feature | Refactor | Test",
+    "description": "What to build — specific enough that a dev doesn't need to ask questions",
+    "acceptance_criteria": "The conditions this task must satisfy",
+    "affected_files": "Best guess from the file tree",
+    "depends_on": "Task numbers or None",
+    "effort": "XS | S | M | L | XL",
+    "complexity": "Low | Medium | High",
+    "risk": "Low | Medium | High",
+    "priority": "P1 | P2 | P3"
+  }
+]
+```
 
 **Cross-repo impact** *(only fill this in if the change genuinely requires code changes in another registered repo)*
-For each affected repo:
 
-### Cross-repo: <owner/repo>
-- **What needs to change:** Specific description of what must change in that repo
-- **Why:** Why this repo is affected — what dependency or integration requires the change
-- **Suggested issue title:** A clear one-line title for the issue to open in that repo
-- **Suggested issue body:** Full description with acceptance criteria for that repo's issue
+If no other repos are affected write: "None — changes are contained to this repo."
 
-If no other repos are affected: "None — changes are contained to this repo."
+Otherwise emit a JSON block:
+
+```json
+[
+  {
+    "repo": "owner/repo",
+    "what": "Specific description of what must change in that repo",
+    "why": "Why this repo is affected",
+    "issue_title": "A clear one-line title for the issue to open in that repo",
+    "issue_body": "Full description with acceptance criteria for that repo's issue"
+  }
+]
+```
 
 **Questions for the BA** *(only if something would actually block a dev from starting)*
 If none: "None — ready to go."

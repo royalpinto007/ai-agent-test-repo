@@ -168,6 +168,7 @@ Post any of these as a comment on a GitHub issue to control the pipeline:
 | `reopen: <reason>` | Reset pipeline back to BA with a reason |
 | `skip-qa` | Mark QA as approved without running the agent |
 | `assign: @username` | Assign all PM-created GitHub issues to a user |
+| `status` | Post a summary of the current pipeline state |
 
 **`revise:` works at every stage.** Examples:
 

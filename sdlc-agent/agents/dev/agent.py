@@ -100,11 +100,34 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         if attempt < MAX_RETRIES:
             output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
 
+    final = attempts[-1]
+
+    if not final["test_passed"]:
+        save_session(session_id, {
+            "stage": "dev",
+            "repo_path": repo_path,
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "codebase_analysis": codebase_analysis,
+            "dev_raw_output": output,
+            "test_passed": False,
+            "test_output": final["test_output"],
+            "attempts": len(attempts),
+        })
+        return {
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "test_passed": False,
+            "test_output": final["test_output"],
+            "attempts": len(attempts),
+            "error": f"Tests failed after {len(attempts)} attempt(s). Use `redo-dev: <instructions>` to fix, or check the branch manually.",
+            "next_stage": "dev (tests failed)",
+        }
+
     all_files = list({**changes, **tests}.keys())
     for path in all_files:
         run_git(["add", path], cwd=repo_path)
 
-    final = attempts[-1]
     import subprocess as _sp
     commit_result = _sp.run(
         ["git", "commit", "-m", f"feat: {issue_title} (attempts: {len(attempts)}, tests: {'pass' if final['test_passed'] else 'fail'})"],

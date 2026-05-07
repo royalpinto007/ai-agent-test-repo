@@ -328,5 +328,58 @@ def get_session(session_id):
     return jsonify({"status": "success", "session": session})
 
 
+@app.route("/status", methods=["POST"])
+def pipeline_status():
+    """Return a human-readable status summary for a session (used by the /status comment command)."""
+    data = request.json or {}
+    sid = _sid(data)
+    session = load_session(sid)
+    if not session:
+        return jsonify({"status": "error", "message": "Session not found"}), 404
+
+    stage = session.get("stage", "unknown")
+    stage_emoji = {
+        "ba": "📋", "sa": "🏗️", "pm": "📊", "dev": "💻", "review": "🔍", "qa": "✅"
+    }.get(stage, "❓")
+
+    lines = [f"**Pipeline Status — `{sid}`**", "", f"**Stage:** {stage_emoji} {stage.upper()}"]
+
+    if stage == "ba":
+        lines.append(f"**BRD ready:** {'Yes' if session.get('brd_draft') else 'No'}")
+    elif stage == "sa":
+        lines.append(f"**SDD ready:** {'Yes' if session.get('sdd') else 'No'}")
+    elif stage == "pm":
+        lines.append(f"**Dev ready:** {'Yes' if session.get('pm_dev_ready') else 'No'}")
+        tasks = session.get("pm_tasks", [])
+        lines.append(f"**Issues created:** {len(tasks)}")
+        cross = session.get("cross_repo_issues", [])
+        if cross:
+            lines.append(f"**Cross-repo issues:** {len(cross)}")
+    elif stage == "dev":
+        lines.append(f"**Branch:** `{session.get('branch', 'n/a')}`")
+        lines.append(f"**Tests:** {'✅ Passing' if session.get('test_passed') else '❌ Failing'}")
+        lines.append(f"**Attempts:** {session.get('attempts', '?')}")
+        pr_url = session.get("pr_url")
+        pr_error = session.get("pr_error")
+        if pr_url:
+            lines.append(f"**PR:** {pr_url}")
+        elif pr_error:
+            lines.append(f"**PR:** ❌ Failed — {pr_error}")
+    elif stage == "review":
+        verdict = session.get("review_verdict", "?")
+        lines.append(f"**Verdict:** {'✅ PASS' if verdict == 'PASS' else '❌ FAIL'}")
+        blocking = session.get("review_blocking_issues", [])
+        if blocking:
+            lines.append(f"**Blocking issues:** {len(blocking)}")
+    elif stage == "qa":
+        lines.append(f"**Approved:** {'Yes' if session.get('approved') else 'No'}")
+        lines.append(f"**Stage gate:** {session.get('stage_gate', '?')}")
+        lines.append(f"**Prod gate:** {session.get('prod_gate', '?')}")
+
+    lines += ["", f"**Next step:** `approve` to advance, `revise: <feedback>` to update, or `reopen: <reason>` to restart."]
+
+    return jsonify({"status": "success", "session_id": sid, "stage": stage, "summary": "\n".join(lines)})
+
+
 if __name__ == "__main__":
     app.run(port=5001)

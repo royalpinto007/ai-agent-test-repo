@@ -1,5 +1,6 @@
 import re
 import os
+import json
 import subprocess
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, create_github_issue
@@ -33,59 +34,25 @@ def _is_ready_for_dev(pm_output):
     return "yes" in tail[:50]
 
 
+def _extract_json_block(text, after_marker=None):
+    """Extract the first JSON array from a fenced code block in text, optionally after a marker."""
+    search_text = text
+    if after_marker:
+        idx = text.lower().find(after_marker.lower())
+        if idx != -1:
+            search_text = text[idx:]
+    m = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', search_text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+    return []
+
+
 def _parse_tasks(pm_output):
-    """Extract tasks from PM output Section 5."""
-    tasks = []
-    # Find Section 5 task breakdown
-    section = pm_output.split("## 5.")
-    if len(section) < 2:
-        section = pm_output.split("## Task Breakdown")
-    if len(section) < 2:
-        return tasks
-
-    body = section[-1].split("## 6.")[0]  # stop at next section
-
-    # Each task starts with ### Task [N]: <title>
-    task_blocks = re.split(r'###\s+Task\s+\[?\d+\]?:\s*', body)
-    for block in task_blocks[1:]:  # skip content before first task
-        lines = block.strip().split("\n")
-        title = lines[0].strip()
-        if not title:
-            continue
-
-        # Extract key fields
-        def _field(pattern, default=""):
-            m = re.search(pattern, block, re.IGNORECASE)
-            return m.group(1).strip() if m else default
-
-        task_type   = _field(r'\*\*Type:\*\*\s*(.+)')
-        description = _field(r'\*\*Description:\*\*\s*(.+)')
-        effort      = _field(r'\*\*Effort Estimate:\*\*\s*(.+)')
-        priority    = _field(r'\*\*Priority:\*\*\s*(.+)')
-        complexity  = _field(r'\*\*Complexity:\*\*\s*(.+)')
-        risk        = _field(r'\*\*Risk:\*\*\s*(.+)')
-        affected    = _field(r'\*\*Affected Files:\*\*\s*(.+)')
-        depends_on  = _field(r'\*\*Depends On:\*\*\s*(.+)')
-        blocked_by  = _field(r'\*\*Blocked By:\*\*\s*(.+)')
-
-        # Grab acceptance criteria block
-        ac_match = re.search(r'\*\*Acceptance Criteria:\*\*(.+?)(?=\*\*\w|$)', block, re.DOTALL)
-        acceptance_criteria = ac_match.group(1).strip() if ac_match else ""
-
-        tasks.append({
-            "title": title,
-            "type": task_type,
-            "description": description,
-            "acceptance_criteria": acceptance_criteria,
-            "effort": effort,
-            "priority": priority,
-            "complexity": complexity,
-            "risk": risk,
-            "affected_files": affected,
-            "depends_on": depends_on,
-            "blocked_by": blocked_by,
-        })
-    return tasks
+    """Extract tasks from the JSON block in the task breakdown section."""
+    return _extract_json_block(pm_output, after_marker="task breakdown")
 
 
 def _priority_to_label(priority):
@@ -130,19 +97,18 @@ def _create_issues_for_tasks(tasks, repo_path, parent_session_id):
     created = []
     for task in tasks:
         body = f"""## Description
-{task['description']}
+{task.get('description', '')}
 
 ## Acceptance Criteria
-{task['acceptance_criteria']}
+{task.get('acceptance_criteria', '')}
 
 ## Details
-- **Type:** {task['type']}
-- **Effort:** {task['effort']}
-- **Complexity:** {task['complexity']}
-- **Risk:** {task['risk']}
-- **Affected Files:** {task['affected_files']}
-- **Depends On:** {task['depends_on']}
-- **Blocked By:** {task['blocked_by']}
+- **Type:** {task.get('type', '')}
+- **Effort:** {task.get('effort', '')}
+- **Complexity:** {task.get('complexity', '')}
+- **Risk:** {task.get('risk', '')}
+- **Affected Files:** {task.get('affected_files', '')}
+- **Depends On:** {task.get('depends_on', 'None')}
 
 ---
 *Created by PM Agent from session `{parent_session_id}`*
@@ -158,42 +124,10 @@ def _create_issues_for_tasks(tasks, repo_path, parent_session_id):
 
 
 def _parse_cross_repo_tasks(pm_output):
-    """Extract cross-repo tasks from PM output Cross-repo impact section."""
-    cross_repo = []
-    # Find cross-repo section
-    section_match = re.search(r'\*\*Cross-repo impact\*\*(.+?)(?=\*\*Questions for the BA\*\*|\*\*PM Recommendation\*\*|## 10\.|$)', pm_output, re.DOTALL | re.IGNORECASE)
-    if not section_match:
-        return cross_repo
-
-    body = section_match.group(1)
-    if re.search(r'none\s*[—–-]\s*changes are contained', body, re.IGNORECASE):
-        return cross_repo
-
-    blocks = re.split(r'###\s+Cross-repo:\s*', body)
-    for block in blocks[1:]:
-        lines = block.strip().split("\n")
-        repo_slug = lines[0].strip()  # owner/repo
-        if not repo_slug or "/" not in repo_slug:
-            continue
-
-        def _field(pattern, default=""):
-            m = re.search(pattern, block, re.IGNORECASE | re.DOTALL)
-            return m.group(1).strip() if m else default
-
-        what = _field(r'\*\*What needs to change:\*\*\s*(.+?)(?=\*\*|$)')
-        why = _field(r'\*\*Why:\*\*\s*(.+?)(?=\*\*|$)')
-        issue_title = _field(r'\*\*Suggested issue title:\*\*\s*(.+?)(?=\*\*|$)')
-        issue_body = _field(r'\*\*Suggested issue body:\*\*\s*(.+?)(?=###|$)')
-
-        cross_repo.append({
-            "repo": repo_slug,
-            "what": what,
-            "why": why,
-            "issue_title": issue_title or f"Cross-repo impact from {repo_slug}",
-            "issue_body": issue_body or f"**What needs to change:** {what}\n\n**Why:** {why}",
-        })
-
-    return cross_repo
+    """Extract cross-repo tasks from the JSON block in the cross-repo section."""
+    items = _extract_json_block(pm_output, after_marker="cross-repo impact")
+    # Filter out any items that aren't valid repo entries
+    return [i for i in items if isinstance(i, dict) and "/" in i.get("repo", "")]
 
 
 def _create_cross_repo_issues(cross_repo_tasks, token, parent_issue_url, parent_session_id):
@@ -263,11 +197,16 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
             owner_repo, issue_num = parts[0].replace("-", "/", 1), parts[1]
             parent_issue_url = f"https://github.com/{owner_repo}/issues/{issue_num}"
 
-    # Create GitHub issues for each task when dev-ready
-    created_issues = []
+    # Create GitHub issues for each task when dev-ready.
+    # Skip creation on revise/followup runs — issues were already created on the first approval.
+    is_revision = bool(human_feedback or ba_answers)
+    already_created = bool(session.get("pm_tasks"))
+
+    created_issues = session.get("pm_tasks", []) if already_created else []
     issues_error = None
-    cross_repo_issues = []
-    if dev_ready and not has_blocking:
+    cross_repo_issues = session.get("cross_repo_issues", []) if already_created else []
+
+    if dev_ready and not has_blocking and not is_revision and not already_created:
         tasks = _parse_tasks(pm_output)
         if tasks:
             created_issues, issues_error = _create_issues_for_tasks(tasks, repo_path, session_id)
