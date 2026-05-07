@@ -1,6 +1,6 @@
 import re
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap
+from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state
 from shared.session import save_session, load_session
 from agents.dev.prompts import codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt
 
@@ -39,6 +39,47 @@ def parse_output(output):
 def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None, main_branch="main"):
     session = load_session(session_id) or {}
     repo_path = repo_path or session.get("repo_path")
+
+    # ── Dependency check ─────────────────────────────────────────────────────
+    # If the PM created sub-issues and the current task declares dependencies,
+    # block until those issues are closed on GitHub.
+    import os as _os
+    token = _os.environ.get("GITHUB_TOKEN", "")
+    pm_tasks = session.get("pm_tasks", [])
+    # Find this issue's task by matching issue number from session_id
+    current_issue_num = session_id.split("-")[-1] if "-" in session_id else None
+    current_task = next(
+        (t for t in pm_tasks if str(t.get("issue_number")) == str(current_issue_num)), None
+    )
+    if current_task and token:
+        depends_raw = current_task.get("depends_on", "None") or "None"
+        if depends_raw.lower() not in ("none", ""):
+            # Extract task numbers from "Task 1, Task 2" style strings
+            import re as _re
+            dep_nums = _re.findall(r'\d+', depends_raw)
+            blocked_by = []
+            for dep_num in dep_nums:
+                dep_task = next((t for t in pm_tasks if str(t.get("issue_number", "")) == dep_num
+                                  or t.get("title", "").startswith(f"Task {dep_num}")), None)
+                if dep_task and dep_task.get("issue_number"):
+                    import subprocess as _sp2
+                    remote = _sp2.run(["git", "remote", "get-url", "origin"],
+                                      cwd=repo_path, capture_output=True, text=True).stdout.strip()
+                    remote = remote.replace("git@github.com:", "https://github.com/")
+                    parts = remote.rstrip(".git").rstrip("/").split("/")
+                    dep_owner, dep_repo = parts[-2], parts[-1]
+                    state = get_github_issue_state(dep_owner, dep_repo, dep_task["issue_number"], token)
+                    if state != "closed":
+                        blocked_by.append({"issue": dep_task["issue_number"], "title": dep_task.get("title", ""), "state": state})
+            if blocked_by:
+                return {
+                    "blocked": True,
+                    "blocked_by": blocked_by,
+                    "issue_title": issue_title,
+                    "error": "This task has unresolved dependencies. Close the blocking issues first.",
+                    "next_stage": "dev (blocked by dependencies)",
+                }
+
     if not branch_name:
         issue_number = session_id.split("-")[-1] if "-" in session_id else session_id
         slug = re.sub(r'[^a-z0-9]+', '-', issue_title.lower()).strip('-')

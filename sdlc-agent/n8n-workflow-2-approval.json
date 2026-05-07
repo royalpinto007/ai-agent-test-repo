@@ -392,6 +392,54 @@
               },
               "renameOutput": true,
               "outputKey": "qa"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.session.stage }}",
+                    "rightValue": "security",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "security"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.session.stage }}",
+                    "rightValue": "deploy-stage",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "deploy-stage"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.session.stage }}",
+                    "rightValue": "deploy-prod",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "deploy-prod"
             }
           ]
         },
@@ -1259,6 +1307,190 @@
       "parameters": {
         "jsCode": "const crypto = require('crypto');\nconst secret = $env.WEBHOOK_SECRET || '';\nif (!secret) return [{json: $input.item.json}]; // skip if no secret configured\n\nconst sig = $input.item.json.headers?.['x-hub-signature-256'] || '';\nconst body = JSON.stringify($input.item.json.body);\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nif (sig !== expected) {\n  throw new Error('Invalid webhook signature \u2014 request rejected');\n}\nreturn [{json: $input.item.json}];"
       }
+    },
+    {
+      "id": "security-request",
+      "name": "Call Security Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1530,
+        380
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/security-agent",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "security-comment",
+      "name": "Comment Security Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        380
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## \ud83d\udd12 Security Scan \u2014 {{ $json.verdict === 'PASS' ? '\u2705 PASS' : ($json.verdict === 'WARN' ? '\u26a0\ufe0f WARN' : '\u274c FAIL') }}\n\n{{ $json.security_output }}\n\n**Next step:** {{ $json.passed ? 'Comment `approve` to run peer review.' : 'Fix security issues, then comment `redo-dev: <fix>` to re-run dev.' }}"
+      }
+    },
+    {
+      "id": "deploy-stage-request",
+      "name": "Call Deploy Stage Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1530,
+        580
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/deploy-agent",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "env",
+              "value": "stage"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "deploy-stage-comment",
+      "name": "Comment Deploy Stage Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        580
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## \ud83d\ude80 Stage Deployment \u2014 {{ $json.overall_ok ? '\u2705 Success' : '\u274c Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '\u2705' : '\u274c' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '\u2705 Passed' : '\u274c Failed' }} {{ $json.smoke_output }}\n{{ $json.merge_result && $json.merge_result.merged ? '**PR:** Merged \u2705' : '' }}\n\n**Next step:** {{ $json.overall_ok ? 'Comment `approve` to deploy to production.' : 'Fix deploy issues and comment `approve` to retry.' }}"
+      }
+    },
+    {
+      "id": "deploy-prod-request",
+      "name": "Call Deploy Prod Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1530,
+        780
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5001/deploy-agent",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "env",
+              "value": "prod"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "deploy-prod-comment",
+      "name": "Comment Deploy Prod Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        780
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## \ud83c\udf89 Production Deployment \u2014 {{ $json.overall_ok ? '\u2705 Complete' : '\u274c Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '\u2705' : '\u274c' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '\u2705 Passed' : '\u274c Failed' }}\n{{ $json.release_url ? '**Release:** ' + $json.release_url : '' }}\n{{ $json.branch_deleted ? '**Branch:** Cleaned up \u2705' : '' }}\n\n{{ $json.overall_ok ? '\ud83c\udfc1 Pipeline complete.' : 'Fix deploy issues and comment `approve` to retry.' }}"
+      }
+    },
+    {
+      "id": "slack-notify",
+      "name": "Slack Notify",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2030,
+        380
+      ],
+      "parameters": {
+        "operation": "postMessage",
+        "channel": "={{ $env.SLACK_CHANNEL || '#deployments' }}",
+        "text": "={{ '[' + $('GitHub Comment Webhook').item.json.body.repository.full_name + '] ' + ($json.stage || 'pipeline') + ' \u2014 ' + ($json.overall_ok !== undefined ? ($json.overall_ok ? '\u2705' : '\u274c') : ($json.verdict === 'PASS' ? '\u2705' : '\u274c')) + ' ' + ($json.issue_title || '') }}",
+        "attachments": []
+      },
+      "continueOnFail": true
     }
   ],
   "connections": {
@@ -1458,6 +1690,27 @@
         [
           {
             "node": "QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Security Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Deploy Stage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Deploy Prod Agent",
             "type": "main",
             "index": 0
           }
@@ -1669,6 +1922,50 @@
         [
           {
             "node": "Comment Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Security Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment Security Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Deploy Stage Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment Deploy Stage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Deploy Prod Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment Deploy Prod Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Security Result": {
+      "main": [
+        [
+          {
+            "node": "Slack Notify",
             "type": "main",
             "index": 0
           }

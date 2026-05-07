@@ -1,7 +1,7 @@
 import re
 import subprocess
 from shared.claude import ask_claude
-from shared.utils import run_git, get_file_tree, read_file
+from shared.utils import run_git, get_file_tree, read_file, get_ci_status
 from shared.session import save_session, load_session
 from agents.review.prompts import review_prompt, revision_review_prompt
 
@@ -67,7 +67,52 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
     if not branch_name:
         raise ValueError("branch is required")
 
-    # Rebase onto current main so the review reflects the real merge state
+    # ── CI status check ──────────────────────────────────────────────────────
+    import os as _os
+    token = _os.environ.get("GITHUB_TOKEN", "")
+    ci_status = "unknown"
+    ci_url = ""
+    if token and repo_path:
+        remote = subprocess.run(["git", "remote", "get-url", "origin"],
+                                cwd=repo_path, capture_output=True, text=True).stdout.strip()
+        remote = remote.replace("git@github.com:", "https://github.com/")
+        parts = remote.rstrip(".git").rstrip("/").split("/")
+        ci_owner, ci_repo = parts[-2], parts[-1]
+        ci_status, ci_url = get_ci_status(ci_owner, ci_repo, branch_name, token)
+
+    if ci_status == "failure":
+        result = {
+            "review": "CI failed — code review skipped until the build passes.",
+            "verdict": "FAIL",
+            "dimensions": {},
+            "blocking_issues": [f"CI failed: {ci_url}" if ci_url else "CI checks failed"],
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "has_blocking_issues": True,
+            "ci_status": ci_status,
+            "ci_url": ci_url,
+            "next_stage": "dev (fix CI)",
+        }
+        save_session(session_id, {**result, "review_verdict": "FAIL", "stage": "review"})
+        return result
+
+    if ci_status == "pending":
+        result = {
+            "review": "CI is still running. Re-trigger review once CI completes.",
+            "verdict": "PENDING",
+            "dimensions": {},
+            "blocking_issues": [],
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "has_blocking_issues": False,
+            "ci_status": ci_status,
+            "ci_url": ci_url,
+            "next_stage": "review (CI pending — approve again once CI passes)",
+        }
+        save_session(session_id, {**result, "review_verdict": "PENDING", "stage": "review"})
+        return result
+
+    # ── Rebase onto current main so the review reflects the real merge state
     rebase_conflict = None
     try:
         run_git(["fetch", "origin", main_branch], cwd=repo_path)
@@ -135,6 +180,8 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
         "branch": branch_name,
         "issue_title": issue_title,
         "has_blocking_issues": len(blocking_issues) > 0,
+        "ci_status": ci_status,
+        "ci_url": ci_url,
         "next_stage": "qa" if verdict == "PASS" else "dev (fix review issues)",
     }
 

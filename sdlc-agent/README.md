@@ -7,17 +7,23 @@ An AI-powered software development pipeline that runs entirely through GitHub is
 ```
 New GitHub Issue
       ↓ (automatic)
-BA Agent       — writes a Business Requirements Document
+BA Agent        — writes a Business Requirements Document
       ↓ (comment: approve)
-SA Agent       — writes a Solution Design Document
+SA Agent        — writes a Solution Design Document
       ↓ (comment: approve)
-PM Agent       — breaks work into tasks, creates GitHub issues per task
+PM Agent        — breaks work into tasks, creates GitHub issues per task
       ↓ (comment: approve)
-Dev Agent      — writes code, runs tests, pushes branch, opens PR
+Dev Agent       — writes code, runs tests, checks task deps, pushes branch, opens PR
       ↓ (comment: approve)
-Review Agent   — peer code review
+Security Agent  — runs npm audit / pip-audit / secret scanning, LLM summary
       ↓ (comment: approve)
-QA Agent       — final sign-off with STAGE and PROD deployment gates
+Review Agent    — checks CI status, rebases onto main, peer code review
+      ↓ (comment: approve)
+QA Agent        — final sign-off
+      ↓ (comment: approve)
+Deploy Agent    — deploys to STAGE, smoke tests, waits for approve
+      ↓ (comment: approve)
+Deploy Agent    — deploys to PROD, auto-merges PR, deletes branch, creates GitHub Release
 ```
 
 Each agent posts its output as a comment on the issue. You review it, then comment to advance — or give feedback to revise.
@@ -74,6 +80,30 @@ curl -X POST http://localhost:5001/repos \
     "main_branch": "main"
   }'
 ```
+
+**Full `repos.json` schema:**
+
+```json
+{
+  "owner/repo": {
+    "repo_path": "/absolute/path/to/cloned/repo",
+    "test_command": ["npm", "test"],
+    "main_branch": "main",
+    "deploy": {
+      "stage": {
+        "command": ["./scripts/deploy.sh", "stage"],
+        "smoke_test": ["curl", "-f", "https://staging.example.com/health"]
+      },
+      "prod": {
+        "command": ["./scripts/deploy.sh", "prod"],
+        "smoke_test": ["curl", "-f", "https://example.com/health"]
+      }
+    }
+  }
+}
+```
+
+`deploy` is optional — if omitted the deploy agent will note no command is configured and still auto-merge the PR.
 
 **Supported test commands by stack:**
 
@@ -193,8 +223,11 @@ The API runs at `http://localhost:5001`.
 | POST | `/sa-agent` | Run SA agent |
 | POST | `/pm-agent` | Run PM agent |
 | POST | `/dev-agent` | Run Dev agent |
+| POST | `/security-agent` | Run Security scan agent |
 | POST | `/review-agent` | Run Review agent |
 | POST | `/qa-agent` | Run QA agent |
+| POST | `/deploy-agent` | Run Deploy agent (`env=stage` or `env=prod`) |
+| GET  | `/metrics` | Pipeline metrics (sessions, retry rates, pass rates) |
 | POST | `/create-pr` | Create PR for existing branch |
 | POST | `/reopen` | Reset pipeline to BA |
 | POST | `/skip-qa` | Manually approve QA |

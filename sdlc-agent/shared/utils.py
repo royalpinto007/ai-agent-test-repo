@@ -276,6 +276,55 @@ def create_github_issue(owner, repo, token, title, body, labels=None, assignees=
         raise RuntimeError(f"GitHub API error {e.code}: {e.read().decode()}")
 
 
+def get_github_issue_state(owner, repo, issue_number, token):
+    """Return 'open' or 'closed' for a GitHub issue, or None on error."""
+    import urllib.request
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}",
+        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read()).get("state")
+    except Exception:
+        return None
+
+
+def get_ci_status(owner, repo, branch_name, token):
+    """
+    Return (status, url) for the latest CI run on branch_name.
+    status: 'success' | 'failure' | 'pending' | 'unknown'
+    """
+    import urllib.request
+    if not token:
+        return "unknown", ""
+    # Check-runs on the latest commit of the branch
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/commits/{branch_name}/check-runs?per_page=20",
+        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json"}
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read())
+            runs = data.get("check_runs", [])
+    except Exception:
+        return "unknown", ""
+
+    if not runs:
+        return "unknown", ""
+
+    statuses = [r.get("conclusion") or r.get("status") for r in runs]
+    url = runs[0].get("html_url", "")
+
+    if any(s in ("failure", "timed_out", "cancelled") for s in statuses):
+        return "failure", url
+    if any(s in ("in_progress", "queued", "waiting", None) for s in statuses):
+        return "pending", url
+    if all(s == "success" for s in statuses):
+        return "success", url
+    return "unknown", url
+
+
 def grep_repo(repo_path, pattern, file_tree):
     matches = []
     for f in file_tree:

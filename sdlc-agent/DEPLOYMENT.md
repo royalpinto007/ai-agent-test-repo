@@ -102,7 +102,10 @@ Add:
 ```
 GITHUB_TOKEN=your_token_here
 WEBHOOK_SECRET=your_webhook_secret_here
+SLACK_CHANNEL=#deployments
 ```
+
+`SLACK_CHANNEL` is optional. If set, the pipeline posts a one-line Slack notification after each stage completes. Configure the Slack credential in n8n (**Settings → Credentials → Add → Slack OAuth2**) and apply it to the **Slack Notify** node in workflow 2.
 
 `WEBHOOK_SECRET` is optional but strongly recommended. Generate one with `openssl rand -hex 32` and use the same value in both this file and the GitHub webhook settings (step 9).
 

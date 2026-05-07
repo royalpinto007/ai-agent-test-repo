@@ -2,11 +2,31 @@
   "royalpinto007/ai-agent-test-repo": {
     "repo_path": "/home/royalpinto007/Open-Source/ai-agent-test-repo",
     "test_command": ["npm", "test"],
-    "main_branch": "main"
+    "main_branch": "main",
+    "deploy": {
+      "stage": {
+        "command": ["echo", "No stage deploy configured"],
+        "smoke_test": null
+      },
+      "prod": {
+        "command": ["echo", "No prod deploy configured"],
+        "smoke_test": null
+      }
+    }
   },
   "royalpinto007/dreamchain-cli": {
     "repo_path": "/home/royalpinto007/dreamchain-cli",
     "test_command": ["npm", "run", "build"],
-    "main_branch": "main"
+    "main_branch": "main",
+    "deploy": {
+      "stage": {
+        "command": ["npm", "run", "build"],
+        "smoke_test": null
+      },
+      "prod": {
+        "command": ["npm", "run", "build"],
+        "smoke_test": null
+      }
+    }
   }
 }

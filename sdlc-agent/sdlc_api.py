@@ -11,8 +11,10 @@ import agents.ba.agent as ba
 import agents.sa.agent as sa
 import agents.pm.agent as pm
 import agents.dev.agent as dev
+import agents.security.agent as security
 import agents.review.agent as review
 import agents.qa.agent as qa
+import agents.deploy.agent as deploy
 
 app = Flask(__name__)
 
@@ -167,6 +169,25 @@ def dev_agent():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route("/security-agent", methods=["POST"])
+def security_agent():
+    data = request.json or {}
+    sid = _sid(data)
+    session = load_session(sid) or {}
+    repo_path, _, main_branch = _repo_config(data, session)
+    try:
+        result = security.run(
+            session_id=sid,
+            repo_path=repo_path,
+            branch_name=data.get("branch") or session.get("branch"),
+            issue_title=data.get("issue_title"),
+            main_branch=main_branch,
+        )
+        return jsonify({"status": "success", "stage": "security", "session_id": sid, "awaiting_approval": True, **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/review-agent", methods=["POST"])
 def review_agent():
     data = request.json or {}
@@ -207,6 +228,55 @@ def qa_agent():
         return jsonify({"status": "success", "stage": "qa", "session_id": sid, **result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/deploy-agent", methods=["POST"])
+def deploy_agent():
+    data = request.json or {}
+    sid = _sid(data)
+    session = load_session(sid) or {}
+    repo_path, _, _ = _repo_config(data, session)
+    env = data.get("env", "stage")
+    try:
+        result = deploy.run(session_id=sid, env=env, repo_path=repo_path)
+        return jsonify({"status": "success", "stage": f"deploy-{env}", "session_id": sid, **result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    import glob, time, json as _json
+    sessions_dir = os.path.join(os.path.dirname(__file__), "sessions")
+    by_stage = {}
+    retry_counts = []
+    review_verdicts = {"PASS": 0, "FAIL": 0}
+    cycle_times = []
+
+    for path in glob.glob(f"{sessions_dir}/*.json"):
+        try:
+            with open(path) as f:
+                s = _json.load(f)
+            stage = s.get("stage", "unknown")
+            by_stage[stage] = by_stage.get(stage, 0) + 1
+            if "attempts" in s:
+                retry_counts.append(s["attempts"])
+            if s.get("review_verdict") in review_verdicts:
+                review_verdicts[s["review_verdict"]] += 1
+        except Exception:
+            pass
+
+    total = sum(by_stage.values())
+    avg_retries = round(sum(retry_counts) / len(retry_counts), 2) if retry_counts else 0
+
+    return jsonify({
+        "status": "success",
+        "total_sessions": total,
+        "by_stage": by_stage,
+        "dev_avg_retries": avg_retries,
+        "review_pass_rate": round(review_verdicts["PASS"] / max(sum(review_verdicts.values()), 1) * 100),
+        "review_verdicts": review_verdicts,
+    })
 
 
 @app.route("/create-pr", methods=["POST"])
