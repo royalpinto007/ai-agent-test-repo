@@ -1,4 +1,5 @@
 import re
+import subprocess
 from shared.claude import ask_claude
 from shared.utils import run_git, get_file_tree, read_file
 from shared.session import save_session, load_session
@@ -65,8 +66,47 @@ def run(session_id, repo_path=None, branch_name=None, issue_title=None,
     if not branch_name:
         raise ValueError("branch is required")
 
-    diff = run_git(["diff", f"main...{branch_name}"], cwd=repo_path)
-    test_diff = run_git(["diff", f"main...{branch_name}", "--", "*test*", "*spec*"], cwd=repo_path)
+    # Rebase onto current main so the review reflects the real merge state
+    rebase_conflict = None
+    try:
+        run_git(["fetch", "origin", "main"], cwd=repo_path)
+        run_git(["checkout", branch_name], cwd=repo_path)
+        rebase_result = subprocess.run(
+            ["git", "rebase", "origin/main"],
+            cwd=repo_path, capture_output=True, text=True
+        )
+        if rebase_result.returncode != 0:
+            # Abort the failed rebase so the repo stays clean
+            subprocess.run(["git", "rebase", "--abort"], cwd=repo_path, capture_output=True)
+            conflict_files = re.findall(r'CONFLICT.*?in (.+)', rebase_result.stdout + rebase_result.stderr)
+            rebase_conflict = {
+                "files": conflict_files or ["(unknown — check git output)"],
+                "output": (rebase_result.stdout + rebase_result.stderr).strip()[:1000],
+            }
+        else:
+            # Push the rebased branch
+            subprocess.run(["git", "push", "--force-with-lease", "origin", branch_name],
+                           cwd=repo_path, capture_output=True)
+    except RuntimeError:
+        pass  # If rebase setup fails, proceed with the existing branch state
+
+    if rebase_conflict:
+        result = {
+            "review": "Rebase failed — branch has conflicts with main.",
+            "verdict": "FAIL",
+            "dimensions": {},
+            "blocking_issues": rebase_conflict["files"],
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "has_blocking_issues": True,
+            "rebase_conflict": rebase_conflict,
+            "next_stage": "dev (resolve conflicts)",
+        }
+        save_session(session_id, {**result, "review_verdict": "FAIL", "stage": "review"})
+        return result
+
+    diff = run_git(["diff", f"origin/main...{branch_name}"], cwd=repo_path)
+    test_diff = run_git(["diff", f"origin/main...{branch_name}", "--", "*test*", "*spec*"], cwd=repo_path)
 
     # If this is a re-review after human feedback or developer revisions
     original_review = session.get("review", "")

@@ -1,6 +1,6 @@
 import re
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request
+from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap
 from shared.session import save_session, load_session
 from agents.dev.prompts import codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt
 
@@ -145,6 +145,11 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     except RuntimeError as e:
         pr_error = str(e)
 
+    # Check for file overlap with other open PRs
+    import os as _os
+    token = _os.environ.get("GITHUB_TOKEN", "")
+    conflicting_prs = check_pr_file_overlap(repo_path, branch_name, token)
+
     result = {
         "branch": branch_name,
         "issue_title": issue_title,
@@ -160,6 +165,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         "attempts": len(attempts),
         "pr_url": pr_url,
         "pr_error": pr_error,
+        "conflicting_prs": conflicting_prs,
         "next_stage": "review",
     }
 

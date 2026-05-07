@@ -170,6 +170,83 @@ def create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_de
         raise RuntimeError(f"GitHub API error {e.code}: {e.read().decode()}")
 
 
+def check_pr_file_overlap(repo_path, current_branch, token):
+    """
+    Fetch all open PRs for this repo and return any that touch the same files
+    as current_branch. Returns a list of dicts: {number, title, url, overlap}.
+    """
+    import urllib.request
+    import urllib.error
+
+    if not token:
+        return []
+
+    remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=repo_path, capture_output=True, text=True
+    ).stdout.strip().replace("git@github.com:", "https://github.com/")
+    parts = remote.rstrip(".git").rstrip("/").split("/")
+    owner, repo = parts[-2], parts[-1]
+
+    # Files changed in the current branch vs main
+    try:
+        diff_output = subprocess.run(
+            ["git", "diff", "--name-only", f"main...{current_branch}"],
+            cwd=repo_path, capture_output=True, text=True
+        ).stdout.strip()
+        current_files = set(f for f in diff_output.splitlines() if f)
+    except Exception:
+        return []
+
+    if not current_files:
+        return []
+
+    # Fetch open PRs
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/pulls?state=open&per_page=50",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+        }
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            open_prs = json.loads(resp.read())
+    except Exception:
+        return []
+
+    conflicts = []
+    for pr in open_prs:
+        if pr.get("head", {}).get("ref") == current_branch:
+            continue  # skip self
+
+        # Fetch files for this PR
+        pr_number = pr["number"]
+        files_req = urllib.request.Request(
+            f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files?per_page=100",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+            }
+        )
+        try:
+            with urllib.request.urlopen(files_req) as resp:
+                pr_files = {f["filename"] for f in json.loads(resp.read())}
+        except Exception:
+            continue
+
+        overlap = current_files & pr_files
+        if overlap:
+            conflicts.append({
+                "number": pr_number,
+                "title": pr.get("title", ""),
+                "url": pr.get("html_url", ""),
+                "overlap": sorted(overlap),
+            })
+
+    return conflicts
+
+
 def create_github_issue(owner, repo, token, title, body, labels=None, assignees=None):
     import urllib.request
     import urllib.error
