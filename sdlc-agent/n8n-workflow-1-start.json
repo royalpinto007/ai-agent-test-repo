@@ -37,7 +37,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/ba-agent",
+        "url": "http://10.68.103.135:5001/ba-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [{ "name": "Content-Type", "value": "application/json" }]

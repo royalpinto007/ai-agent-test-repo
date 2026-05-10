@@ -177,7 +177,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "url": "=http://10.68.103.135:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
         "options": {
           "allowUnauthorizedCerts": false
         },
@@ -222,7 +222,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "url": "=http://10.68.103.135:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
         "options": {
           "allowUnauthorizedCerts": false
         },
@@ -267,7 +267,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://localhost:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
+        "url": "=http://10.68.103.135:5001/session/{{ $json.body.repository.owner.login }}-{{ $json.body.repository.name }}-{{ $json.body.issue.number }}",
         "options": {
           "allowUnauthorizedCerts": false
         },
@@ -570,7 +570,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/sa-agent",
+        "url": "http://10.68.103.135:5001/sa-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -599,7 +599,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/pm-agent",
+        "url": "http://10.68.103.135:5001/pm-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -628,7 +628,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/dev-agent",
+        "url": "http://10.68.103.135:5001/dev-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -657,7 +657,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/review-agent",
+        "url": "http://10.68.103.135:5001/review-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -686,7 +686,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/qa-agent",
+        "url": "http://10.68.103.135:5001/qa-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -715,7 +715,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/ba-agent",
+        "url": "http://10.68.103.135:5001/ba-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -744,7 +744,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/sa-agent",
+        "url": "http://10.68.103.135:5001/sa-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -773,7 +773,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/pm-agent",
+        "url": "http://10.68.103.135:5001/pm-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -802,7 +802,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/review-agent",
+        "url": "http://10.68.103.135:5001/review-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -831,7 +831,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/qa-agent",
+        "url": "http://10.68.103.135:5001/qa-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -860,7 +860,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/dev-agent",
+        "url": "http://10.68.103.135:5001/dev-agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -889,7 +889,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/reopen",
+        "url": "http://10.68.103.135:5001/reopen",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -918,7 +918,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/skip-qa",
+        "url": "http://10.68.103.135:5001/skip-qa",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -947,7 +947,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/assign",
+        "url": "http://10.68.103.135:5001/assign",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1016,7 +1016,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## \ud83d\udcbb Dev Agent \u2014 Implementation {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.test_passed ? '' : '\\n> \u26a0\ufe0f Tests failed after all retries. Use `redo-dev: <instructions>` to fix, or push a manual fix to the branch.\\n' }}{{ $json.pr_url ? '**PR:** ' + $json.pr_url : ($json.pr_error ? '**PR:** \u274c ' + $json.pr_error + '\\n\\nTo create the PR manually:\\n```\\ncurl -X POST http://localhost:5001/create-pr -H \"Content-Type: application/json\" -d \\'{\"session_id\": \"{{ $json.session_id || $(\\'GitHub Comment Webhook\\').item.json.body.repository.owner.login + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.repository.name + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.issue.number }}\"}\\'\\n```' : '') }}\n\n{{ $json.conflicting_prs && $json.conflicting_prs.length > 0 ? '\\n---\\n\u26a0\ufe0f **Potential merge conflicts detected**\\nThe following open PRs touch the same files:\\n' + $json.conflicting_prs.map(p => `- [#${p.number} ${p.title}](${p.url}) \u2014 overlapping files: ${p.overlap.join(', ')}`).join('\\n') + '\\n\\nReview the order you merge these. The second merge will likely need a rebase.' : '' }}\n\n{{ $json.test_passed ? '**Next step:** Comment `approve` to start peer review.' : '**Next step:** Fix the test failures, then comment `redo-dev: <what you fixed>` to re-run.' }}"
+        "body": "=## \ud83d\udcbb Dev Agent \u2014 Implementation {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.test_passed ? '' : '\\n> \u26a0\ufe0f Tests failed after all retries. Use `redo-dev: <instructions>` to fix, or push a manual fix to the branch.\\n' }}{{ $json.pr_url ? '**PR:** ' + $json.pr_url : ($json.pr_error ? '**PR:** \u274c ' + $json.pr_error + '\\n\\nTo create the PR manually:\\n```\\ncurl -X POST http://10.68.103.135:5001/create-pr -H \"Content-Type: application/json\" -d \\'{\"session_id\": \"{{ $json.session_id || $(\\'GitHub Comment Webhook\\').item.json.body.repository.owner.login + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.repository.name + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.issue.number }}\"}\\'\\n```' : '') }}\n\n{{ $json.conflicting_prs && $json.conflicting_prs.length > 0 ? '\\n---\\n\u26a0\ufe0f **Potential merge conflicts detected**\\nThe following open PRs touch the same files:\\n' + $json.conflicting_prs.map(p => `- [#${p.number} ${p.title}](${p.url}) \u2014 overlapping files: ${p.overlap.join(', ')}`).join('\\n') + '\\n\\nReview the order you merge these. The second merge will likely need a rebase.' : '' }}\n\n{{ $json.test_passed ? '**Next step:** Comment `approve` to start peer review.' : '**Next step:** Fix the test failures, then comment `redo-dev: <what you fixed>` to re-run.' }}"
       },
       "id": "comment-dev",
       "name": "Comment Dev Result",
@@ -1254,7 +1254,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/status",
+        "url": "http://10.68.103.135:5001/status",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -1319,7 +1319,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/security-agent",
+        "url": "http://10.68.103.135:5001/security-agent",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -1372,7 +1372,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/deploy-agent",
+        "url": "http://10.68.103.135:5001/deploy-agent",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
@@ -1429,7 +1429,7 @@
       ],
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:5001/deploy-agent",
+        "url": "http://10.68.103.135:5001/deploy-agent",
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
