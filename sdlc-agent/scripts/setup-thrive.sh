@@ -67,9 +67,10 @@ detect_test_command() {
 
 # ── Detect main branch ────────────────────────────────────────────────────────
 detect_main_branch() {
-  local dir="$1"
+  local repo_name="$1"
   local branch
-  branch=$(git -C "$dir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+  branch=$(gh_api "https://api.github.com/repos/$FORK_ACCOUNT/$repo_name" | \
+           python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('default_branch','main'))" 2>/dev/null)
   echo "${branch:-main}"
 }
 
@@ -159,7 +160,7 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
 
   # Detect test command and main branch
   TEST_CMD=$(detect_test_command "$LOCAL_DIR")
-  MAIN_BRANCH=$(detect_main_branch "$LOCAL_DIR")
+  MAIN_BRANCH=$(detect_main_branch "$REPO_NAME")
 
   # Register with API
   RESULT=$(curl -s -X POST "$API_URL/repos" \
