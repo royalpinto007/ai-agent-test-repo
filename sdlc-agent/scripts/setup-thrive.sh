@@ -79,10 +79,10 @@ echo ""
 info "━━━ Cloning requirements repo ━━━"
 REQS_DIR="$CLONE_DIR/$REQUIREMENTS_REPO"
 if [ ! -d "$REQS_DIR" ]; then
-  git clone "https://github.com/$SOURCE_ORG/$REQUIREMENTS_REPO.git" "$REQS_DIR"
+  git clone "https://${TOKEN}@github.com/$SOURCE_ORG/$REQUIREMENTS_REPO.git" "$REQS_DIR"
   info "Cloned thrive-requirements"
 else
-  git -C "$REQS_DIR" pull -q
+  git -C "$REQS_DIR" pull -q 2>/dev/null || true
   info "thrive-requirements already cloned — pulled latest"
 fi
 
