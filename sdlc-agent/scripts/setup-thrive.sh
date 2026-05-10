@@ -136,7 +136,7 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
     else
       warn "  Clone failed/timed out for $REPO_NAME — skipping"
       rm -rf "$LOCAL_DIR"
-      (( FAILED++ ))
+      FAILED=$((FAILED + 1))
       continue
     fi
   else
@@ -159,7 +159,7 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
     }")
   REGISTERED=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('registered') or d.get('message','?'))" 2>/dev/null)
   info "  Registered: $REGISTERED (test: $TEST_CMD, branch: $MAIN_BRANCH)"
-  (( SUCCEEDED++ ))
+  SUCCEEDED=$((SUCCEEDED + 1))
 done
 
 # ── Step 4: Set upstream sync cron ───────────────────────────────────────────
