@@ -140,8 +140,7 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
       continue
     fi
   else
-    timeout 60 git -C "$LOCAL_DIR" pull -q 2>/dev/null || true
-    info "  Already cloned — pulled latest"
+    info "  Already cloned — skipping pull"
   fi
 
   # Detect test command and main branch
