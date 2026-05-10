@@ -6,6 +6,7 @@
 # Requirements: GITHUB_TOKEN must be set (token for the agent-accellier account)
 
 set -e
+export GIT_TERMINAL_PROMPT=0
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
