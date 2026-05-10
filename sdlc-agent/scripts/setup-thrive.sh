@@ -14,7 +14,7 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SOURCE_ORG="Thrive-ERP"
-FORK_ACCOUNT="agent-accellier"
+FORK_ACCOUNT="Thrive-ERP"
 REQUIREMENTS_REPO="thrive-requirements"
 CLONE_DIR="/opt/repos"
 API_URL="http://localhost:5001"
@@ -116,9 +116,9 @@ done
 
 info "Found ${#ALL_REPOS[@]} code repos to process"
 
-# ── Step 3: Fork, clone, and register each repo ──────────────────────────────
+# ── Step 3: Clone and register each repo ─────────────────────────────────────
 echo ""
-info "━━━ Forking, cloning, registering ━━━"
+info "━━━ Cloning and registering ━━━"
 
 SUCCEEDED=0
 FAILED=0
@@ -127,35 +127,19 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
   echo ""
   echo "  → $REPO_NAME"
 
-  # Fork if not already forked
-  FORK_CHECK=$(gh_api "https://api.github.com/repos/$FORK_ACCOUNT/$REPO_NAME" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('full_name',''))" 2>/dev/null)
-  if [ -z "$FORK_CHECK" ]; then
-    info "  Forking $SOURCE_ORG/$REPO_NAME → $FORK_ACCOUNT"
-    gh_post "https://api.github.com/repos/$SOURCE_ORG/$REPO_NAME/forks" \
-      "{\"organization\":\"$FORK_ACCOUNT\"}" > /dev/null
-    sleep 2  # GitHub needs a moment to create the fork
-  else
-    info "  Fork already exists: $FORK_CHECK"
-  fi
-
-  # Clone the fork
+  # Clone directly from Thrive-ERP
   LOCAL_DIR="$CLONE_DIR/$REPO_NAME"
   if [ ! -d "$LOCAL_DIR" ]; then
-    if git clone "https://github.com/$FORK_ACCOUNT/$REPO_NAME.git" "$LOCAL_DIR" 2>/dev/null; then
+    if git clone "https://${TOKEN}@github.com/$SOURCE_ORG/$REPO_NAME.git" "$LOCAL_DIR" 2>/dev/null; then
       info "  Cloned to $LOCAL_DIR"
     else
-      warn "  Clone failed for $REPO_NAME — fork may still be creating, retry later"
+      warn "  Clone failed for $REPO_NAME — skipping"
       (( FAILED++ ))
       continue
     fi
   else
     git -C "$LOCAL_DIR" pull -q 2>/dev/null || true
     info "  Already cloned — pulled latest"
-  fi
-
-  # Add upstream remote (for future sync)
-  if ! git -C "$LOCAL_DIR" remote | grep -q upstream 2>/dev/null; then
-    git -C "$LOCAL_DIR" remote add upstream "https://github.com/$SOURCE_ORG/$REPO_NAME.git" 2>/dev/null || true
   fi
 
   # Detect test command and main branch
@@ -166,7 +150,7 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
   RESULT=$(curl -s -X POST "$API_URL/repos" \
     -H "Content-Type: application/json" \
     -d "{
-      \"owner\": \"$FORK_ACCOUNT\",
+      \"owner\": \"$SOURCE_ORG\",
       \"repo\": \"$REPO_NAME\",
       \"repo_path\": \"$LOCAL_DIR\",
       \"test_command\": $TEST_CMD,
@@ -206,15 +190,15 @@ echo -e "${GREEN}━━━ Done ━━━${NC}"
 echo ""
 echo "  Requirements repo : $SOURCE_ORG/$REQUIREMENTS_REPO → $REQS_DIR"
 echo "  Code repos        : $SUCCEEDED registered, $FAILED failed"
-echo "  Forks             : github.com/$FORK_ACCOUNT/*"
-echo "  Upstream sync     : daily at 2am via cron"
+echo "  Repos             : github.com/$SOURCE_ORG/*"
+echo "  Pull sync         : daily at 2am via cron"
 echo ""
 echo "Verify with:"
 echo "  curl http://localhost:5001/repos | python3 -m json.tool"
 echo ""
 
 if [ "$FAILED" -gt 0 ]; then
-  warn "$FAILED repos failed (forks still creating). Run this script again in 60s to retry."
+  warn "$FAILED repos failed to clone. Run this script again to retry."
 fi
 
 # ── Step 5: Add GitHub webhook instructions ───────────────────────────────────
