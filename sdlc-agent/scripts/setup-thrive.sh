@@ -131,15 +131,16 @@ for REPO_NAME in "${ALL_REPOS[@]}"; do
   # Clone directly from Thrive-ERP
   LOCAL_DIR="$CLONE_DIR/$REPO_NAME"
   if [ ! -d "$LOCAL_DIR" ]; then
-    if git clone "https://${TOKEN}@github.com/$SOURCE_ORG/$REPO_NAME.git" "$LOCAL_DIR" 2>/dev/null; then
+    if timeout 120 git clone --depth=1 "https://${TOKEN}@github.com/$SOURCE_ORG/$REPO_NAME.git" "$LOCAL_DIR" 2>/dev/null; then
       info "  Cloned to $LOCAL_DIR"
     else
-      warn "  Clone failed for $REPO_NAME — skipping"
+      warn "  Clone failed/timed out for $REPO_NAME — skipping"
+      rm -rf "$LOCAL_DIR"
       (( FAILED++ ))
       continue
     fi
   else
-    git -C "$LOCAL_DIR" pull -q 2>/dev/null || true
+    timeout 60 git -C "$LOCAL_DIR" pull -q 2>/dev/null || true
     info "  Already cloned — pulled latest"
   fi
 
