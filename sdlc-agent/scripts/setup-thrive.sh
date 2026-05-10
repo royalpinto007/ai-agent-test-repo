@@ -105,7 +105,7 @@ info "━━━ Fetching Thrive-ERP repo list ━━━"
 ALL_REPOS=()
 PAGE=1
 while true; do
-  BATCH=$(gh_api "https://api.github.com/orgs/$SOURCE_ORG/repos?per_page=100&page=$PAGE&type=public" | \
+  BATCH=$(gh_api "https://api.github.com/orgs/$SOURCE_ORG/repos?per_page=100&page=$PAGE&type=all" | \
           python3 -c "import sys,json; repos=json.load(sys.stdin); [print(r['name']) for r in repos if r['name'] != '$REQUIREMENTS_REPO']")
   [ -z "$BATCH" ] && break
   while IFS= read -r name; do
