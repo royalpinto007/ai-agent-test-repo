@@ -1474,23 +1474,6 @@
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
         "body": "=## \ud83c\udf89 Production Deployment \u2014 {{ $json.overall_ok ? '\u2705 Complete' : '\u274c Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '\u2705' : '\u274c' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '\u2705 Passed' : '\u274c Failed' }}\n{{ $json.release_url ? '**Release:** ' + $json.release_url : '' }}\n{{ $json.branch_deleted ? '**Branch:** Cleaned up \u2705' : '' }}\n\n{{ $json.overall_ok ? '\ud83c\udfc1 Pipeline complete.' : 'Fix deploy issues and comment `approve` to retry.' }}"
       }
-    },
-    {
-      "id": "slack-notify",
-      "name": "Slack Notify",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.2,
-      "position": [
-        2160,
-        -620
-      ],
-      "parameters": {
-        "operation": "postMessage",
-        "channel": "={{ $env.SLACK_CHANNEL || '#deployments' }}",
-        "text": "={{ '[' + $('GitHub Comment Webhook').item.json.body.repository.full_name + '] ' + ($json.stage || 'pipeline') + ' \u2014 ' + ($json.overall_ok !== undefined ? ($json.overall_ok ? '\u2705' : '\u274c') : ($json.verdict === 'PASS' ? '\u2705' : '\u274c')) + ' ' + ($json.issue_title || '') }}",
-        "attachments": []
-      },
-      "continueOnFail": true
     }
   ],
   "connections": {
@@ -1963,13 +1946,7 @@
     },
     "Comment Security Result": {
       "main": [
-        [
-          {
-            "node": "Slack Notify",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     }
   },
