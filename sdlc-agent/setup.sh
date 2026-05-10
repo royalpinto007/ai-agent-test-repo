@@ -182,6 +182,9 @@ else
     warn "certbot failed — run manually: certbot --nginx -d ${SERVER_HOST}"
 fi
 
+# ── Make scripts executable ───────────────────────────────────────────────────
+chmod +x "$INSTALL_DIR/sdlc-agent/scripts/"*.sh 2>/dev/null || true
+
 # ── Sessions cleanup cron ─────────────────────────────────────────────────────
 section "Cron: session cleanup"
 (crontab -l 2>/dev/null; echo "0 3 * * * find ${INSTALL_DIR}/sdlc-agent/sessions -name '*.json' -mtime +30 -delete") | crontab -
@@ -235,3 +238,11 @@ echo "  journalctl -u n8n -f              # n8n logs"
 echo "  systemctl restart sdlc-api        # restart after code changes"
 echo ""
 echo -e "Webhook secret (save this): ${YELLOW}${WEBHOOK_SECRET}${NC}"
+echo ""
+echo "━━━ Thrive-ERP setup (optional) ━━━"
+echo ""
+echo "If you are setting this up for Thrive-ERP / agent-accellier, run:"
+echo "  GITHUB_TOKEN=\$GITHUB_TOKEN bash ${INSTALL_DIR}/sdlc-agent/scripts/setup-thrive.sh"
+echo ""
+echo "This will fork all 31 Thrive-ERP repos to agent-accellier, clone them,"
+echo "register them with the API, and set up daily upstream sync."

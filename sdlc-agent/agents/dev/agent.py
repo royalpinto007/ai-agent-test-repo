@@ -38,7 +38,16 @@ def parse_output(output):
 
 def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None, main_branch="main"):
     session = load_session(session_id) or {}
-    repo_path = repo_path or session.get("repo_path")
+
+    # If PM identified a specific code repo to work on (requirements-repo flow),
+    # override repo_path, test_command, and main_branch from it.
+    target_repo = session.get("target_repo")
+    if target_repo and isinstance(target_repo, dict):
+        repo_path = repo_path or target_repo.get("repo_path") or session.get("repo_path")
+        test_command = test_command or target_repo.get("test_command")
+        main_branch = target_repo.get("main_branch", main_branch)
+    else:
+        repo_path = repo_path or session.get("repo_path")
 
     # ── Dependency check ─────────────────────────────────────────────────────
     # If the PM created sub-issues and the current task declares dependencies,

@@ -19,3 +19,13 @@ def all_repos():
             return json.load(f)
     except FileNotFoundError:
         return {}
+
+
+def get_code_repos():
+    """Return all repos that are NOT requirements repos."""
+    return {k: v for k, v in all_repos().items() if not v.get("requirements_repo")}
+
+
+def is_requirements_repo(owner, repo):
+    cfg = get_repo_config(owner, repo)
+    return bool(cfg and cfg.get("requirements_repo"))

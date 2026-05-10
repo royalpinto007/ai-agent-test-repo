@@ -37,9 +37,23 @@ def _sid(data):
 
 
 def _repo_config(data, session):
-    """Resolve repo_path and test_command from repos.json or session fallback."""
+    """Resolve repo_path and test_command from repos.json or session fallback.
+    When a target_repo is set in the session (requirements-repo flow), use it
+    for dev/security/review stages instead of the issue repo."""
     owner = data.get("owner") or session.get("owner", "")
     repo = data.get("repo") or session.get("repo", "")
+
+    # If PM identified a specific code repo, use it for non-PM stages
+    target = session.get("target_repo")
+    if target and isinstance(target, dict) and target.get("repo_path"):
+        slug = target.get("slug", "")
+        if slug and "/" in slug:
+            t_owner, t_repo = slug.split("/", 1)
+            cfg = get_repo_config(t_owner, t_repo)
+            if cfg:
+                return cfg.get("repo_path", target["repo_path"]), cfg.get("test_command"), cfg.get("main_branch", "main")
+        return target["repo_path"], target.get("test_command"), target.get("main_branch", "main")
+
     if owner and repo:
         cfg = get_repo_config(owner, repo)
         if cfg:
@@ -132,7 +146,11 @@ def pm_agent():
     data = request.json or {}
     sid = _sid(data)
     session = load_session(sid) or {}
-    repo_path, _, _ = _repo_config(data, session)
+    # PM always runs against the issue repo (not target_repo) — it needs the requirements context
+    owner = data.get("owner") or session.get("owner", "")
+    repo_name = data.get("repo") or session.get("repo", "")
+    cfg = get_repo_config(owner, repo_name) if owner and repo_name else {}
+    repo_path = (cfg or {}).get("repo_path") or session.get("repo_path") or DEFAULT_REPO_PATH
     try:
         result = pm.run(
             session_id=sid,

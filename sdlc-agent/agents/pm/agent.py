@@ -5,7 +5,7 @@ import subprocess
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, create_github_issue
 from shared.session import save_session, load_session
-from shared.config import all_repos
+from shared.config import all_repos, get_code_repos, is_requirements_repo
 from agents.pm.prompts import brd_review_prompt, questions_followup_prompt, revision_prompt as pm_revision_prompt
 
 
@@ -162,16 +162,32 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
     if not brd:
         raise ValueError("brd is required — pass session_id or explicit brd")
 
-    file_tree_str = "\n".join(get_file_tree(repo_path))
     sdd = session.get("sdd", "")
 
-    # Build list of other registered repos (exclude current one)
-    current_owner_repo = session_id.rsplit("-", 1)[0].replace("-", "/", 1) if "-" in session_id else ""
-    try:
-        registered = all_repos()
-        other_repos = [slug for slug in registered if slug != current_owner_repo]
-    except Exception:
-        other_repos = []
+    # Detect if this session is driven from a requirements repo (e.g. thrive-requirements)
+    parts = session_id.rsplit("-", 1)
+    current_owner_repo = parts[0].replace("-", "/", 1) if "-" in session_id else ""
+    current_owner, current_repo_name = (current_owner_repo.split("/", 1) + [""])[:2]
+    on_requirements_repo = is_requirements_repo(current_owner, current_repo_name)
+
+    if on_requirements_repo:
+        # Build a combined file tree from ALL registered code repos
+        code_repos = get_code_repos()
+        combined_tree_lines = []
+        for slug, cfg in code_repos.items():
+            rp = cfg.get("repo_path", "")
+            if rp and os.path.isdir(rp):
+                for f in get_file_tree(rp):
+                    combined_tree_lines.append(f"{slug}/{f}")
+        file_tree_str = "\n".join(combined_tree_lines) if combined_tree_lines else "(no code repos cloned yet)"
+        other_repos = list(code_repos.keys())
+    else:
+        file_tree_str = "\n".join(get_file_tree(repo_path))
+        try:
+            registered = all_repos()
+            other_repos = [slug for slug in registered if slug != current_owner_repo]
+        except Exception:
+            other_repos = []
 
     if human_feedback and session.get("pm_output"):
         pm_output = ask_claude(pm_revision_prompt(
@@ -216,6 +232,21 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
             if cross_repo_tasks:
                 cross_repo_issues = _create_cross_repo_issues(cross_repo_tasks, token, parent_issue_url, session_id)
 
+    # When on a requirements repo, the primary target for Dev is the first affected code repo.
+    # Cross-repo issues cover the rest.
+    target_repo = session.get("target_repo")
+    if not target_repo and on_requirements_repo and cross_repo_issues:
+        first = cross_repo_issues[0]
+        target_slug = first.get("repo", "")
+        if target_slug:
+            code_cfg = get_code_repos().get(target_slug, {})
+            target_repo = {
+                "slug": target_slug,
+                "repo_path": code_cfg.get("repo_path", ""),
+                "test_command": code_cfg.get("test_command"),
+                "main_branch": code_cfg.get("main_branch", "main"),
+            }
+
     save_session(session_id, {
         "pm_output": pm_output,
         "pm_has_blocking_questions": has_blocking,
@@ -223,6 +254,7 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "pm_tasks": created_issues,
         "cross_repo_issues": cross_repo_issues,
         "repo_path": repo_path,
+        "target_repo": target_repo,
         "stage": "pm",
     })
 
@@ -233,5 +265,6 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "created_issues": created_issues,
         "issues_error": issues_error,
         "cross_repo_issues": cross_repo_issues,
+        "target_repo": target_repo,
         "next_stage": "pm (answer questions)" if has_blocking else "dev",
     }
