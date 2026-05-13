@@ -488,5 +488,20 @@ def pipeline_status():
     return jsonify({"status": "success", "session_id": sid, "stage": stage, "summary": "\n".join(lines)})
 
 
+@app.route("/set-milestone", methods=["POST"])
+def set_milestone_endpoint():
+    data = request.json or {}
+    owner = data.get("owner", "")
+    repo = data.get("repo", "")
+    issue_number = data.get("issue_number")
+    milestone_title = data.get("milestone_title", "")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not all([owner, repo, issue_number, milestone_title, token]):
+        return jsonify({"status": "error", "message": "missing required fields"}), 400
+    from shared.utils import set_issue_milestone
+    ok = set_issue_milestone(owner, repo, issue_number, milestone_title, token)
+    return jsonify({"status": "success" if ok else "error", "milestone": milestone_title})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

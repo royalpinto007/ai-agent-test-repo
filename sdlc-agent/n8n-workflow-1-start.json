@@ -26,11 +26,11 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.body.action }}",
-              "rightValue": "opened",
+              "leftValue": "={{ ($json.body.action === 'opened' || $json.body.action === 'assigned') && ($json.body.issue.assignees || []).some(a => a.login === 'support-accellier') }}",
+              "rightValue": true,
               "operator": {
-                "type": "string",
-                "operation": "equals"
+                "type": "boolean",
+                "operation": "true"
               }
             }
           ]
@@ -43,6 +43,84 @@
       "position": [
         460,
         300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BA Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-ba-awaiting",
+      "name": "Set Milestone BA Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        580,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BA Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-ba-working",
+      "name": "Set Milestone BA Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        220
       ]
     },
     {
@@ -67,19 +145,19 @@
           "parameters": [
             {
               "name": "owner",
-              "value": "={{ $json.body.repository.owner.login }}"
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
             },
             {
               "name": "repo",
-              "value": "={{ $json.body.repository.name }}"
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
             },
             {
               "name": "issue_number",
-              "value": "={{ $json.body.issue.number }}"
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
             },
             {
               "name": "requirement",
-              "value": "={{ $json.body.issue.title + ' ' + ($json.body.issue.body ?? '') }}"
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
             }
           ]
         }
@@ -100,7 +178,7 @@
         "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
-        "body": "=## \ud83e\udd16 BA Agent \u2014 Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
       },
       "id": "comment-brd",
       "name": "Comment BRD on Issue",
@@ -128,12 +206,34 @@
       "main": [
         [
           {
-            "node": "BA Agent",
+            "node": "Set Milestone BA Awaiting Approval",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "Set Milestone BA Awaiting Approval": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone BA Working",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone BA Working": {
+      "main": [
+        [
+          {
+            "node": "BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "BA Agent": {

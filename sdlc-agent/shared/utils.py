@@ -297,6 +297,57 @@ def post_github_comment(owner, repo, issue_number, body, token):
         return None
 
 
+def get_or_create_milestone(owner, repo, title, token):
+    """Get milestone number by title, creating it if it doesn't exist."""
+    import urllib.request, urllib.error
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"}
+    # List existing milestones
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/milestones?per_page=100&state=open",
+        headers=headers
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            milestones = json.loads(resp.read())
+            for m in milestones:
+                if m["title"] == title:
+                    return m["number"]
+    except Exception:
+        pass
+    # Create it
+    payload = json.dumps({"title": title}).encode()
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/milestones",
+        data=payload, headers=headers, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())["number"]
+    except Exception:
+        return None
+
+
+def set_issue_milestone(owner, repo, issue_number, milestone_title, token):
+    """Set milestone on a GitHub issue by title (creates milestone if needed)."""
+    import urllib.request
+    num = get_or_create_milestone(owner, repo, milestone_title, token)
+    if num is None:
+        return False
+    payload = json.dumps({"milestone": num}).encode()
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}",
+        data=payload,
+        headers={"Authorization": f"token {token}", "Accept": "application/vnd.github+json", "Content-Type": "application/json"},
+        method="PATCH"
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            resp.read()
+            return True
+    except Exception:
+        return False
+
+
 def get_github_issue_state(owner, repo, issue_number, token):
     """Return 'open' or 'closed' for a GitHub issue, or None on error."""
     import urllib.request
