@@ -23,7 +23,7 @@ Each agent posts its output as a comment on the issue. You review it, then comme
 
 ## Quick links
 
-- [Deployment guide](sdlc-agent/DEPLOYMENT.md) — set up on a Linux server
-- [Issue guide](sdlc-agent/ISSUE_GUIDE.md) — how to write issues for best results
-- [n8n setup](sdlc-agent/N8N_SETUP.md) — import and configure the workflows
-- [Pipeline reference](sdlc-agent/PIPELINE_REFERENCE.md) — full pipeline reference
+- [Deployment guide](DEPLOYMENT.md) — set up on a Linux server
+- [Issue guide](ISSUE_GUIDE.md) — how to write issues for best results
+- [n8n setup](N8N_SETUP.md) — import and configure the workflows
+- [Pipeline reference](PIPELINE_REFERENCE.md) — full pipeline reference
