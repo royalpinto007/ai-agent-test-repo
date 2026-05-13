@@ -1,19 +1,19 @@
-# How to Write a Good Issue for the SDLC Agent
+# How to Write Issues for the SDLC Agent
 
-The pipeline starts the moment you open a GitHub issue. Everything — the BRD, the architecture, the task breakdown, the code — flows from what you write here. A vague issue produces vague output. A clear issue produces a PR you can merge.
+The pipeline starts when you assign `support-accellier` to an issue on `Thrive-ERP/thrive-requirements`. Everything — the BRD, the architecture, the task breakdown, the code — flows from what you write. A vague issue produces vague output. A clear issue produces a PR you can merge.
 
 ---
 
-## Before you open an issue
+## Trigger
 
-Make sure the pipeline is running:
+The pipeline does **not** start when an issue is created. It starts when `support-accellier` is **assigned** to the issue.
 
-1. The SDLC API is up (`curl http://localhost:5001/repos` returns your repos)
-2. n8n is running and both workflows are active (green toggle)
-3. ngrok (or your tunnel) is forwarding to n8n on port 5678
-4. The GitHub webhook is pointing to your tunnel URL
+This means you can:
+- Draft issues without triggering the pipeline
+- Review and edit the description before assigning
+- Assign later when you're ready for the agents to start
 
-If any of these are off, the issue will open but nothing will happen.
+Once `support-accellier` is assigned, the BA agent starts immediately and the first milestone (`BA Working`) is set.
 
 ---
 
@@ -21,13 +21,13 @@ If any of these are off, the issue will open but nothing will happen.
 
 ### Title
 
-Write the title as a short, specific action. The Dev agent uses it as the branch name and commit message, so make it descriptive enough to be meaningful in a git log.
+Write the title as a short, specific action. The Dev agent uses it as the branch name and commit message prefix.
 
 **Good:**
 ```
-Add delete command to task CLI
-Fix pagination bug on /api/posts endpoint
-Refactor auth middleware to use JWT instead of sessions
+Add FedEx shipping rate integration to delivery module
+Fix pagination bug on /api/orders endpoint
+Refactor auth middleware to use JWT
 ```
 
 **Bad:**
@@ -37,17 +37,17 @@ Improvements
 Update stuff
 ```
 
-### Description
+### Body
 
-The description is what the BA agent reads first. Give it enough context to write a real requirements document without having to guess.
+The body is what the BA agent reads first. Give it enough to write a real requirements document.
 
 A solid description covers:
 
-**What** — what are you trying to build or fix?
-**Why** — what problem does this solve, or what value does it add?
-**Who** — who uses this? (user, admin, internal service, etc.)
-**Scope** — what's explicitly in and out of scope?
-**Constraints** — any technical constraints, deadlines, or dependencies?
+- **What** — what are you building or fixing?
+- **Why** — what problem does this solve?
+- **Who** — who uses this? (user, admin, warehouse operator, etc.)
+- **Scope** — what's explicitly in and out of scope?
+- **Constraints** — technical constraints, existing systems to integrate with
 
 ---
 
@@ -63,7 +63,7 @@ A solid description covers:
 [Why this is needed — user pain point, business requirement, or missing capability]
 
 ## Who uses it
-[User type — e.g. end user, admin, another service]
+[User type — end user, admin, warehouse operator, etc.]
 
 ## Expected behaviour
 - [Bullet each expected behaviour or flow]
@@ -73,7 +73,7 @@ A solid description covers:
 - [Anything you explicitly don't want the agent to build]
 
 ## Additional context
-[Any related issues, PRs, existing code references, or design decisions]
+[Related issues, existing code references, third-party APIs involved]
 ```
 
 ### Bug fix
@@ -91,7 +91,7 @@ A solid description covers:
 [What should happen instead]
 
 ## Environment / context
-[Relevant version, stack, config — no secrets or env vars]
+[Relevant version, stack, config — no secrets or tokens]
 
 ## Root cause (if known)
 [Your best guess, or leave blank]
@@ -104,13 +104,13 @@ A solid description covers:
 [Which module, file, or pattern needs changing]
 
 ## Why now
-[What's the trigger — performance issue, upcoming feature, maintenance burden]
+[Performance issue, upcoming feature, maintenance burden]
 
 ## What good looks like
-[The target state — what should be true after the refactor]
+[The target state after the refactor]
 
 ## Constraints
-[What must not change — API contracts, behaviour, test coverage requirements]
+[What must not change — API contracts, behaviour, test coverage]
 ```
 
 ---
@@ -121,50 +121,72 @@ A solid description covers:
 |---------|---------------|
 | One-line description | BA agent has nothing to work with, produces a generic BRD |
 | Missing "why" | PM agent can't prioritise correctly, may over- or under-scope |
-| Ambiguous scope | Dev agent guesses, often too broad or too narrow |
-| Mixing multiple unrelated features | Pipeline handles one thing at a time — split it |
-| Referencing private context ("as discussed") | Agents can't read Slack or meeting notes |
+| Ambiguous scope | Dev agent guesses — often too broad or too narrow |
+| Multiple unrelated features | Split it. One pipeline run = one coherent change. |
+| "As discussed" references | Agents can't read Slack or meeting notes |
+| Secrets or tokens in the body | Never put credentials in issue descriptions |
 
 ---
 
-## Cross-repo issues
+## After you assign the issue
 
-If your change touches more than one registered repo, say so in the description. The PM agent will detect it and automatically open issues in the other repos.
+The pipeline runs automatically. You'll see the first milestone change to `BA Working`, then a BA agent comment within 1-2 minutes.
 
-```
-## Cross-repo impact
-This change also requires updating the `dreamchain-cli` repo:
-- The CLI needs a new --format flag to consume the new API response shape
-```
-
-You don't need to manually open issues in the other repo — the PM agent handles it.
-
----
-
-## After you open the issue
-
-The pipeline runs automatically. You'll see a comment from the BA agent within a minute or two.
-
-From there, you control it entirely through comments:
+From there, control the pipeline through comments:
 
 | Comment | What it does |
 |---------|-------------|
 | `approve` | Advance to the next stage |
-| `revise: <feedback>` | Re-run the current stage with your feedback |
-| `redo-dev: <instructions>` | Re-run only the Dev agent with extra instructions |
-| `reopen: <reason>` | Reset the whole pipeline back to BA |
-| `skip-qa` | Mark QA approved without running the agent |
+| `revise: <feedback>` | Re-run the current agent with your feedback |
+| `redo-dev: <instructions>` | Re-run only the Dev agent |
+| `reopen: <reason>` | Reset the entire pipeline back to BA |
 | `assign: @username` | Assign all PM-created sub-issues to someone |
+| `status` | Show current pipeline state |
 
 ### Giving feedback with `revise:`
 
-Use `revise:` any time the agent output isn't right. Be specific — the agent will re-run with your note as extra context.
+Use `revise:` any time the agent output isn't right. Be specific:
 
 ```
-revise: scope is too broad, focus only on the API layer, skip the frontend tasks
-revise: split task 3 into two issues — schema migration and the API handler separately
-revise: the acceptance criteria for task 1 are missing the error case when the token is expired
+revise: scope is too broad — focus only on the API layer, skip the frontend
+revise: split task 3 into two issues: schema migration and the API handler separately
+revise: the acceptance criteria for task 1 are missing the error case when the token expires
 ```
+
+---
+
+## Milestone progression
+
+As the pipeline advances, the GitHub milestone on the issue updates automatically:
+
+```
+BA Working → BA Awaiting Approval
+                ↓ approve
+SA Working → SA Awaiting Approval
+                ↓ approve
+PM Working → PM Awaiting Approval
+                ↓ approve
+DEV Working → DEV Awaiting Approval
+                ↓ approve
+Deploy / Complete
+```
+
+Only one milestone is active at a time. You can filter issues by milestone in the GitHub UI to see where each one is in the pipeline.
+
+---
+
+## Cross-repo changes
+
+If a change touches more than one Thrive-ERP repo, say so in the description. The PM agent detects it and automatically opens sub-issues in the other repos.
+
+```
+## Cross-repo impact
+This change also requires updating thrive-pos:
+- The POS checkout screen needs a new delivery option selector
+- The carrier rate API response shape changes from this work
+```
+
+You don't need to open issues in the other repo manually — the PM agent handles it.
 
 ---
 
@@ -172,41 +194,50 @@ revise: the acceptance criteria for task 1 are missing the error case when the t
 
 **Title:**
 ```
-Add rate limiting to the public API endpoints
+Add FedEx real-time shipping rates to the delivery module
 ```
 
-**Description:**
+**Body:**
 ```
 ## What
-Add per-IP rate limiting to all public-facing API routes (/api/posts, /api/users).
+Integrate FedEx REST API into the existing delivery module so users can get
+live shipping rates at checkout instead of manual price rules.
 
 ## Why
-We're seeing abuse from scrapers hitting the endpoints in tight loops. No rate limiting is in place today.
+Currently all delivery costs are entered manually or use fixed rules.
+Sales reps have to look up FedEx rates separately and type them in,
+which causes errors and slows down order confirmation.
+
+## Who uses it
+Warehouse operators creating shipments, and sales reps confirming orders
+with customers over the phone.
 
 ## Expected behaviour
-- Requests beyond 100/minute per IP get a 429 response with a Retry-After header
-- Authenticated requests have a higher limit (500/minute)
-- Limits are configurable without a code deploy
+- At checkout, the delivery wizard shows live FedEx rates for the order
+  (Ground, 2Day, Overnight) with estimated transit days
+- Operator selects a rate and it's added to the order
+- On shipment validation, a FedEx label is generated and stored on the picking
+- Tracking number appears on the picking and links to FedEx tracking page
+- If FedEx API returns an error, show the error message — don't silently fail
 
 ## Out of scope
-- Rate limiting on internal/admin routes
-- Per-user limits (IP-based is enough for now)
-- A dashboard for monitoring rate limit hits
+- UPS or DHL integration (follow-on)
+- Label printing infrastructure (assume PDF download for now)
+- Tracking status webhooks / polling
 
 ## Constraints
-- Must work with the existing Express middleware stack
-- Redis is already in the stack and can be used for the counter store
+- Target the FedEx REST API (2022+), not the deprecated SOAP API
+- API credentials must be configurable per carrier record, not hardcoded
+- Must work with the existing delivery.carrier model and wizard flow
 ```
-
-This gives the BA agent everything it needs: the what, why, behaviour, explicit out-of-scope, and a constraint. The PM agent can scope tasks cleanly. The Dev agent knows exactly what to build.
 
 ---
 
-## Checklist before submitting
+## Checklist before assigning
 
 - [ ] Title is a specific action, not a category
-- [ ] Description explains what, why, and who
+- [ ] Body explains what, why, and who
 - [ ] Scope is explicit — what's in, what's out
-- [ ] No secrets, tokens, or env variable values in the description
+- [ ] No secrets, tokens, or credentials in the body
 - [ ] If cross-repo, the affected repos are named
 - [ ] One feature or bug per issue (not a bundle)

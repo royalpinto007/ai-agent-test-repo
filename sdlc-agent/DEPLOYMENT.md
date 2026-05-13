@@ -1,401 +1,219 @@
-# Deploying the SDLC Agent on a Server
+# Deploying the SDLC Agent
 
-This guide covers running the full pipeline — Flask API, n8n, and Claude Code CLI — on a Linux server with a public IP. Once set up, you point GitHub webhooks at the server and the pipeline runs entirely remotely.
+This guide covers running the full pipeline on an Ubuntu server or LXC container. Once set up, GitHub webhooks drive everything automatically.
 
 ---
 
-## What runs on the server
+## Architecture
 
-| Component | Port | What it does |
-|-----------|------|-------------|
-| Flask API (`sdlc_api.py`) | 5001 | Receives n8n calls, runs agents, writes sessions |
-| n8n | 5678 | Handles GitHub webhooks, routes approvals |
-| nginx | 80 / 443 | Reverse proxy — exposes n8n and optionally the API |
-| Claude Code CLI | — | Called by the API as a subprocess to run LLM calls |
+```
+GitHub (issues + webhooks)
+        │
+        ▼
+  agent-workflow.accellier.net   ← n8n (webhook router + approval handler)
+        │
+        ▼  HTTP calls to port 5001
+  10.68.103.135 (LXC container)
+  ├── sdlc-api (Flask, port 5001)   ← runs agents
+  ├── /opt/repos/*                  ← 30 Thrive-ERP repos cloned here
+  └── Claude Code CLI               ← LLM engine
+```
+
+n8n runs at `agent-workflow.accellier.net` and calls the Flask API at `http://10.68.103.135:5001`.
+
+---
+
+## Quick setup (new server)
+
+Run the one-shot setup script on a fresh Ubuntu 24.04 server or LXC container:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/royalpinto007/ai-agent-test-repo/main/sdlc-agent/setup.sh -o setup.sh
+bash setup.sh
+```
+
+It will prompt for:
+- GitHub Personal Access Token (`repo` scope)
+- Server IP or domain
+- Webhook secret (auto-generated if left blank)
+
+The script installs Node.js 20, Python, Claude Code CLI, n8n, nginx, and creates systemd services for the API and n8n.
+
+After it completes, follow the printed next steps.
 
 ---
 
 ## Server requirements
 
-- Ubuntu 22.04 or Debian 12 (any modern Linux works)
-- 2 vCPU, 4 GB RAM minimum (agents run Claude Code as subprocesses — more RAM = better)
-- 20 GB disk
-- A public IP or domain name
-- Ports 80, 443, and 5678 open in your firewall
-
-Providers that work well: Hetzner CX22, DigitalOcean Droplet (2 GB+), AWS EC2 t3.small, Vultr.
+| Resource | Minimum |
+|----------|---------|
+| OS | Ubuntu 22.04+ or Debian 12 |
+| CPU | 2 vCPU |
+| RAM | 4 GB (8 GB recommended) |
+| Disk | 50 GB (repos take space) |
+| Network | Public IP or accessible from n8n |
 
 ---
 
-## 1. System dependencies
+## Post-install steps
 
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git python3 python3-pip python3-venv nginx curl unzip
-```
-
-### Node.js (required for Claude Code CLI and n8n)
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-### Claude Code CLI
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-Authenticate it — this is the only interactive step:
+### 1. Authenticate Claude Code CLI
 
 ```bash
 claude
 ```
 
-Follow the browser login flow. Once authenticated, `claude -p "hello"` should return a response. The auth token is stored in `~/.claude/` and persists across sessions.
-
-### n8n
+Open the URL it prints, log in with your Anthropic account, paste the code back. Verify:
 
 ```bash
-npm install -g n8n
+claude -p "say hello"
 ```
 
----
-
-## 2. Clone the repo and install Python dependencies
+### 2. Clone and register Thrive-ERP repos
 
 ```bash
-git clone https://github.com/royalpinto007/ai-agent-test-repo.git /opt/sdlc-agent
-cd /opt/sdlc-agent
-
-python3 -m venv venv
-source venv/bin/activate
-pip install -r sdlc-agent/requirements.txt
+GITHUB_TOKEN=<token-with-Thrive-ERP-read-access> \
+  bash /opt/sdlc-agent/sdlc-agent/scripts/setup-thrive.sh
 ```
 
----
+This clones all 30 Thrive-ERP repos to `/opt/repos/` and registers them with the API. Takes ~5 minutes.
 
-## 3. Clone your target repos
-
-Each repo the agents will work on must be cloned locally on the server:
-
+Verify:
 ```bash
-git clone https://github.com/your-org/your-repo.git /opt/repos/your-repo
+curl -s http://localhost:5001/repos | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d['repos']), 'repos registered')"
 ```
 
-The `GITHUB_TOKEN` you set in step 4 needs push access to these repos.
+### 3. Configure environment
 
----
-
-## 4. Environment variables
-
-Create a file that holds your secrets (not committed to git):
-
-```bash
-sudo mkdir -p /etc/sdlc-agent
-sudo nano /etc/sdlc-agent/env
-```
-
-Add:
+The env file at `/etc/sdlc-agent/env` must contain:
 
 ```
 GITHUB_TOKEN=your_token_here
 WEBHOOK_SECRET=your_webhook_secret_here
-SLACK_CHANNEL=#deployments
 ```
 
-`SLACK_CHANNEL` is optional. If set, the pipeline posts a one-line Slack notification after each stage completes. Configure the Slack credential in n8n (**Settings → Credentials → Add → Slack OAuth2**) and apply it to the **Slack Notify** node in workflow 2.
-
-`WEBHOOK_SECRET` is optional but strongly recommended. Generate one with `openssl rand -hex 32` and use the same value in both this file and the GitHub webhook settings (step 9).
-
-Set permissions so only root can read it:
-
+After editing:
 ```bash
-sudo chmod 600 /etc/sdlc-agent/env
+systemctl restart sdlc-api
 ```
 
-These get loaded into the systemd services in step 6.
+### 4. Import n8n workflows
 
----
+Open n8n at `https://agent-workflow.accellier.net`.
 
-## 5. Configure repos.json
-
-Edit `/opt/sdlc-agent/sdlc-agent/repos.json` with the repos you cloned in step 3:
-
-```json
-{
-  "your-org/your-repo": {
-    "repo_path": "/opt/repos/your-repo",
-    "test_command": ["npm", "test"],
-    "main_branch": "main"
-  }
-}
-```
-
-Or add repos at runtime via the API after the service is running:
-
-```bash
-curl -X POST http://localhost:5001/repos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "owner": "your-org",
-    "repo": "your-repo",
-    "repo_path": "/opt/repos/your-repo",
-    "test_command": ["npm", "test"],
-    "main_branch": "main"
-  }'
-```
-
----
-
-## 6. Systemd services
-
-### Flask API
-
-```bash
-sudo nano /etc/systemd/system/sdlc-api.service
-```
-
-```ini
-[Unit]
-Description=SDLC Agent API
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/opt/sdlc-agent/sdlc-agent
-EnvironmentFile=/etc/sdlc-agent/env
-ExecStart=/opt/sdlc-agent/venv/bin/python sdlc_api.py
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-> Replace `User=ubuntu` with whatever user owns `/opt/sdlc-agent` on your server.
-
-### n8n
-
-```bash
-sudo nano /etc/systemd/system/n8n.service
-```
-
-```ini
-[Unit]
-Description=n8n Workflow Automation
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-EnvironmentFile=/etc/sdlc-agent/env
-Environment=N8N_PORT=5678
-Environment=N8N_PROTOCOL=http
-Environment=WEBHOOK_URL=https://your-domain.com
-ExecStart=/usr/bin/n8n start
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-> Set `WEBHOOK_URL` to your domain or server IP. n8n uses this to build webhook URLs correctly.
-
-Enable and start both:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable sdlc-api n8n
-sudo systemctl start sdlc-api n8n
-```
-
-Check they're running:
-
-```bash
-sudo systemctl status sdlc-api
-sudo systemctl status n8n
-```
-
----
-
-## 7. nginx reverse proxy
-
-nginx sits in front of n8n so GitHub webhooks hit port 80/443 instead of 5678.
-
-```bash
-sudo nano /etc/nginx/sites-available/sdlc
-```
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # n8n — GitHub webhooks hit this
-    location / {
-        proxy_pass http://localhost:5678;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Optional: expose the SDLC API directly (useful for debugging)
-    location /api/ {
-        rewrite ^/api/(.*)$ /$1 break;
-        proxy_pass http://localhost:5001;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/sdlc /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### HTTPS (recommended)
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
-
-Certbot auto-renews. Once done, your webhook URL is `https://your-domain.com/webhook/sdlc-start`.
-
----
-
-## 8. Import n8n workflows
-
-Open n8n in a browser at `http://your-domain.com` (or `http://your-server-ip:5678` if you skipped nginx).
-
-1. **Workflows → Import from File**
-2. Import `n8n-workflow-1-start.json`
-3. Import `n8n-workflow-2-approval.json`
-4. Add your GitHub credentials: **Settings → Credentials → Add → GitHub API** (paste your token)
+1. Delete any existing SDLC workflows
+2. Import workflow 1:
+   ```
+   https://raw.githubusercontent.com/royalpinto007/ai-agent-test-repo/main/sdlc-agent/n8n-workflow-1-start.json
+   ```
+3. Import workflow 2:
+   ```
+   https://raw.githubusercontent.com/royalpinto007/ai-agent-test-repo/main/sdlc-agent/n8n-workflow-2-approval.json
+   ```
+4. Add GitHub credential: **Settings → Credentials → Add → GitHub API** (paste token)
 5. Apply the credential to every GitHub node in both workflows
-6. Activate both workflows (green toggle, top right)
+6. Activate both workflows (green toggle)
 
----
+### 5. Add GitHub webhook
 
-## 9. GitHub webhook
-
-In each repo you want the pipeline to watch:
-
-**Settings → Webhooks → Add webhook**
+Go to `https://github.com/Thrive-ERP/thrive-requirements/settings/hooks` → Add webhook:
 
 | Field | Value |
 |-------|-------|
-| Payload URL | `https://your-domain.com/webhook/sdlc-start` |
+| Payload URL | `https://agent-workflow.accellier.net/webhook/sdlc-start` |
 | Content type | `application/json` |
-| Secret | the value of `WEBHOOK_SECRET` from step 4 |
+| Secret | value of `WEBHOOK_SECRET` from `/etc/sdlc-agent/env` |
 | Events | Issues, Issue comments |
 
-For multiple repos: add the same webhook URL to each one. The pipeline reads the owner and repo name from the payload automatically.
+### 6. Create GitHub milestones
 
----
+Create these milestones on `Thrive-ERP/thrive-requirements` at `https://github.com/Thrive-ERP/thrive-requirements/milestones`:
 
-## 10. Verify everything works
+- `BA Awaiting Approval`
+- `BA Working`
+- `SA Awaiting Approval`
+- `SA Working`
+- `PM Awaiting Approval`
+- `PM Working`
+- `DEV Awaiting Approval`
+- `DEV Working`
+- `Deploy / Complete`
 
-```bash
-# API is up
-curl http://localhost:5001/repos
+The API creates them automatically if missing, but creating upfront avoids the first-run delay.
 
-# n8n is up
-curl http://localhost:5678/healthz
-
-# Claude Code CLI works
-claude -p "say hello"
-```
-
-Then open a test issue in one of your repos. Within a minute you should see the BA agent comment.
-
----
-
-## Keeping repos in sync
-
-The BA agent runs `git pull` before each run, so the local clone stays current. But if you push directly to the repo from another machine, the server clone will catch up on the next issue.
-
-For repos with dependencies (npm, pip, etc.), you may need to re-run installs after major dependency updates. There's no automatic hook for this — do it manually or add it to your deployment process.
-
----
-
-## Logs
+### 7. Verify
 
 ```bash
-# API logs
-sudo journalctl -u sdlc-api -f
-
-# n8n logs
-sudo journalctl -u n8n -f
-
-# nginx logs
-sudo tail -f /var/log/nginx/access.log
-sudo tail -f /var/log/nginx/error.log
+curl http://localhost:5001/repos          # API up, repos registered
+curl http://localhost:5678/healthz        # n8n up
+claude -p "say hello"                     # Claude CLI working
 ```
 
 ---
 
-## Updating the pipeline
+## Firewall / NAT (LXC containers)
+
+If the API runs inside an LXC container on a bridged network, the host needs to forward traffic to the container:
 
 ```bash
-cd /opt/sdlc-agent
-git pull
-source venv/bin/activate
-pip install -r sdlc-agent/requirements.txt  # only if requirements changed
-sudo systemctl restart sdlc-api
+# On the LXD host
+iptables -I FORWARD -p tcp -d 10.68.103.135 --dport 5001 -j ACCEPT
+iptables -t nat -A PREROUTING -i eno1np0 -p tcp --dport 5001 -j DNAT --to-destination 10.68.103.135:5001
 ```
 
-n8n workflows update in the n8n UI — reimport the JSON files and re-activate.
+Replace `eno1np0` with your host's external interface and `10.68.103.135` with the container's IP.
 
 ---
 
-## Adding a new repo later
+## Useful commands
 
-1. Clone it on the server: `git clone https://github.com/org/repo.git /opt/repos/repo`
-2. Register it:
-   ```bash
-   curl -X POST http://localhost:5001/repos \
-     -H "Content-Type: application/json" \
-     -d '{"owner": "org", "repo": "repo", "repo_path": "/opt/repos/repo", "test_command": ["npm", "test"], "main_branch": "main"}'
-   ```
-3. Add the GitHub webhook to that repo (same URL as step 9)
+```bash
+# Service status
+systemctl status sdlc-api
+systemctl status n8n
 
-No n8n changes needed.
+# Live logs
+journalctl -u sdlc-api -f
+journalctl -u n8n -f
+
+# Restart after code changes
+git -C /opt/sdlc-agent pull
+systemctl restart sdlc-api
+
+# Check registered repos
+curl http://localhost:5001/repos | python3 -m json.tool
+```
+
+---
+
+## Updating
+
+```bash
+git -C /opt/sdlc-agent pull
+systemctl restart sdlc-api
+```
+
+For n8n workflow changes: delete and reimport the JSON files in n8n UI, re-apply GitHub credential, re-activate.
 
 ---
 
 ## Troubleshooting
 
-**BA agent doesn't fire when I open an issue**
-- Check the webhook delivered: repo → Settings → Webhooks → your webhook → Recent Deliveries
-- Check n8n workflow 1 is active
-- Check API is running: `sudo systemctl status sdlc-api`
+**API unreachable from n8n**
+- Check it's bound to `0.0.0.0`: `ss -tlnp | grep 5001` should show `0.0.0.0:5001`
+- Check iptables rules allow forwarding to the container
+- Test from n8n's network: `curl http://10.68.103.135:5001/repos`
 
-**n8n can't reach the API (ECONNREFUSED)**
-- The API service may have crashed: `sudo journalctl -u sdlc-api --no-pager -n 50`
-- Restart it: `sudo systemctl restart sdlc-api`
+**Claude CLI not authenticated after reboot**
+- Auth is stored in `~/.claude/` for the user that ran `claude`
+- The systemd service must run as the same user: check `User=` in `/etc/systemd/system/sdlc-api.service`
+- Re-authenticate: run `claude` as that user and follow the browser flow
 
-**Claude Code CLI not found**
-- Make sure `claude` is in the PATH for the user running the API service
-- Check: `which claude` as that user
-- If installed globally via npm, it's usually at `/usr/bin/claude` or `/usr/local/bin/claude`
+**`setup-thrive.sh` hangs mid-clone**
+- Some repos are large; `--depth=1` is used but clones can still take 60-120s each
+- The script has 120s timeouts — it will skip and continue; re-run to retry failed repos
+- Run with `GIT_TERMINAL_PROMPT=0` to prevent credential prompts blocking the script
 
-**Git push fails from Dev agent**
-- The `GITHUB_TOKEN` in `/etc/sdlc-agent/env` needs `repo` scope and write access to the target repo
-- Test manually: `git push` from the cloned repo directory as the service user
-
-**Sessions directory fills up**
-- Sessions live in `sdlc-agent/sessions/` — safe to delete old ones
-- Add a cron to clean up sessions older than 30 days:
-  ```bash
-  0 3 * * * find /opt/sdlc-agent/sdlc-agent/sessions -name "*.json" -mtime +30 -delete
-  ```
+**n8n expression errors**
+- Ensure Body Content Type is `JSON` and Specify Body is `Using JSON` (not Raw) in each HTTP Request node
+- Expression values must use `={{ ... }}` syntax — a backslash before `$` breaks evaluation

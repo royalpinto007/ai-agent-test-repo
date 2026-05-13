@@ -1,94 +1,173 @@
-# SDLC Agent
+# SDLC Agent — Reference
 
-An AI-powered software development pipeline that runs entirely through GitHub issues and comments. Open an issue, and a chain of AI agents handles the full lifecycle — from requirements to QA sign-off — with human approval at every stage.
-
-## How it works
-
-```
-New GitHub Issue
-      ↓ (automatic)
-BA Agent        — writes a Business Requirements Document
-      ↓ (comment: approve)
-SA Agent        — writes a Solution Design Document
-      ↓ (comment: approve)
-PM Agent        — breaks work into tasks, creates GitHub issues per task
-      ↓ (comment: approve)
-Dev Agent       — writes code, runs tests, checks task deps, pushes branch, opens PR
-      ↓ (comment: approve)
-Security Agent  — runs npm audit / pip-audit / secret scanning, LLM summary
-      ↓ (comment: approve)
-Review Agent    — checks CI status, rebases onto main, peer code review
-      ↓ (comment: approve)
-QA Agent        — final sign-off
-      ↓ (comment: approve)
-Deploy Agent    — deploys to STAGE, smoke tests, waits for approve
-      ↓ (comment: approve)
-Deploy Agent    — deploys to PROD, auto-merges PR, deletes branch, creates GitHub Release
-```
-
-Each agent posts its output as a comment on the issue. You review it, then comment to advance — or give feedback to revise.
+An AI-powered software development pipeline that runs entirely through GitHub issues and comments. Assign an issue to `support-accellier` and a chain of AI agents handles the full lifecycle — with human approval at every stage.
 
 ---
 
-## Prerequisites
+## Pipeline overview
 
-- Python 3.10+
-- [Claude Code CLI](https://claude.ai/code) installed and authenticated (`claude` available in PATH)
-- [n8n](https://n8n.io) running locally (default port 5678)
-- [ngrok](https://ngrok.com) or any tunnel to expose n8n to GitHub webhooks
-- A GitHub Personal Access Token with `repo` scope
+```
+Issue assigned to support-accellier
+      ↓  milestone → BA Working
+BA Agent        — reads codebase, writes Business Requirements Document
+      ↓  comment: approve  →  milestone → SA Working
+SA Agent        — writes Solution Design Document (architecture, components, risks)
+      ↓  comment: approve  →  milestone → PM Working
+PM Agent        — breaks work into tasks, creates GitHub sub-issues per task
+      ↓  comment: approve  →  milestone → DEV Working
+Dev Agent       — writes code, runs tests (up to 3 retries), pushes branch, opens PR
+      ↓  comment: approve  →  milestone → Deploy / Complete
+Deploy Agent    — deploys to STAGE, runs smoke tests
+                  comment: approve → deploys to PROD
+                  auto-merges PR, deletes branch, creates GitHub Release
+```
+
+At every stage you can:
+- `approve` — advance to the next agent
+- `revise: <feedback>` — re-run the current agent with your notes
 
 ---
 
-## Setup
+## Trigger
 
-### 1. Clone and install dependencies
+The pipeline starts **only** when an issue is assigned to `support-accellier`.
 
-```bash
-git clone https://github.com/your-org/your-repo
-cd your-repo/sdlc-agent
+- Issue opened without that assignee → nothing happens
+- Issue opened with `support-accellier` assigned → pipeline starts immediately
+- Existing issue later assigned to `support-accellier` → pipeline starts from BA
 
-python3 -m venv ../venv
-source ../venv/bin/activate
-pip install -r requirements.txt
+This lets you create draft issues without triggering the pipeline prematurely.
+
+---
+
+## Milestones
+
+The pipeline automatically creates and updates GitHub milestones as it progresses:
+
+| Milestone | When it's set |
+|-----------|--------------|
+| BA Working | Issue assigned to support-accellier, BA agent running |
+| BA Awaiting Approval | BA agent complete, waiting for `approve` |
+| SA Working | SA agent running |
+| SA Awaiting Approval | SA agent complete, waiting for `approve` |
+| PM Working | PM agent running |
+| PM Awaiting Approval | PM agent complete, waiting for `approve` |
+| DEV Working | Dev agent running |
+| DEV Awaiting Approval | Dev agent complete, waiting for `approve` |
+| Deploy / Complete | Deploy complete |
+
+Only one milestone is active at a time. The old one is replaced when the pipeline advances.
+
+---
+
+## Comment commands
+
+Post any of these as a comment on the issue:
+
+| Comment | What it does |
+|---------|-------------|
+| `approve` | Advance to the next stage |
+| `revise: <feedback>` | Re-run the current agent with your feedback |
+| `redo-dev: <instructions>` | Re-run only the Dev agent with extra instructions |
+| `reopen: <reason>` | Reset the entire pipeline back to BA |
+| `assign: @username` | Assign all PM-created sub-issues to a user |
+| `status` | Post a summary of current pipeline state |
+
+### Using `revise:`
+
+Works at every stage. Be specific — the agent re-runs with your note as extra context:
+
+```
+revise: scope is too broad, focus only on the API layer
+revise: split task 3 into two issues — schema migration and API handler separately
+revise: acceptance criteria for task 1 are missing the error case
 ```
 
-### 2. Register your repo
+---
 
-Edit `repos.json` to add your repo:
+## Multi-repo support (Thrive-ERP setup)
 
-```json
-{
-  "your-org/your-repo": {
-    "repo_path": "/absolute/path/to/cloned/repo",
-    "test_command": ["npm", "test"],
-    "main_branch": "main"
-  }
-}
+The pipeline supports a hub-and-spoke model where:
+- Issues are created in a single **requirements repo** (`Thrive-ERP/thrive-requirements`)
+- Code changes land in one or more **code repos** (`Thrive-ERP/*`)
+
+The PM agent reads the issue, determines which code repo(s) are affected, and the Dev agent works in the correct repo automatically. Cross-repo issues are opened as sub-issues in the affected repos.
+
+All 30 Thrive-ERP code repos are cloned to `/opt/repos/` on the server and registered with the API.
+
+---
+
+## Project structure
+
+```
+sdlc-agent/
+├── agents/
+│   ├── ba/              # Business Analyst — BRD from issue + codebase analysis
+│   ├── sa/              # Solution Architect — SDD with components and risks
+│   ├── pm/              # Project Manager — task breakdown, GitHub sub-issues
+│   ├── dev/             # Developer — code, tests, PR (3 retry attempts)
+│   └── deploy/          # Deploy — stage/prod deploy, auto-merge, GitHub Release
+├── shared/
+│   ├── claude.py        # Claude Code CLI wrapper (claude -p)
+│   ├── config.py        # repos.json loader, requirements_repo detection
+│   ├── session.py       # per-issue session persistence
+│   └── utils.py         # git, GitHub API, milestone, file tree helpers
+├── sessions/            # per-issue JSON state (gitignored)
+├── repos.json           # registered repos
+├── sdlc_api.py          # Flask API (port 5001)
+├── setup.sh             # one-shot Ubuntu server setup
+├── scripts/
+│   └── setup-thrive.sh  # clone + register all Thrive-ERP repos
+├── n8n-workflow-1-start.json      # webhook → BA agent
+└── n8n-workflow-2-approval.json   # comment commands → agents
 ```
 
-Or do it via the API after starting (see step 4):
+---
+
+## API endpoints
+
+The Flask API runs on port 5001.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/repos` | List all registered repos |
+| POST | `/repos` | Register a repo |
+| GET | `/session/<id>` | Inspect a pipeline session |
+| POST | `/ba-agent` | Run BA agent |
+| POST | `/sa-agent` | Run SA agent |
+| POST | `/pm-agent` | Run PM agent |
+| POST | `/dev-agent` | Run Dev agent |
+| POST | `/deploy-agent` | Run Deploy agent (`env=stage` or `env=prod`) |
+| POST | `/set-milestone` | Set GitHub issue milestone by title |
+| POST | `/reopen` | Reset pipeline to BA |
+| POST | `/assign` | Assign sub-issues to a user |
+| GET | `/metrics` | Pipeline metrics (sessions, retry rates) |
+| GET | `/status` | Current pipeline status for a session |
+
+**Session ID format:** `{owner}-{repo}-{issue_number}`
+Example: `Thrive-ERP-thrive-requirements-17`
 
 ```bash
-curl -X POST http://localhost:5001/repos \
+# Inspect any session
+curl http://localhost:5001/session/Thrive-ERP-thrive-requirements-17
+
+# Manually trigger BA agent
+curl -X POST http://localhost:5001/ba-agent \
   -H "Content-Type: application/json" \
-  -d '{
-    "owner": "your-org",
-    "repo": "your-repo",
-    "repo_path": "/absolute/path/to/cloned/repo",
-    "test_command": ["npm", "test"],
-    "main_branch": "main"
-  }'
+  -d '{"owner":"Thrive-ERP","repo":"thrive-requirements","issue_number":17,"requirement":"..."}'
 ```
 
-**Full `repos.json` schema:**
+---
+
+## repos.json schema
 
 ```json
 {
   "owner/repo": {
-    "repo_path": "/absolute/path/to/cloned/repo",
+    "repo_path": "/opt/repos/repo-name",
     "test_command": ["npm", "test"],
     "main_branch": "main",
+    "requirements_repo": false,
     "deploy": {
       "stage": {
         "command": ["./scripts/deploy.sh", "stage"],
@@ -103,9 +182,10 @@ curl -X POST http://localhost:5001/repos \
 }
 ```
 
-`deploy` is optional — if omitted the deploy agent will note no command is configured and still auto-merge the PR.
+- `requirements_repo: true` — marks this as an issue hub (e.g. thrive-requirements). The PM agent builds a combined file tree from all code repos.
+- `deploy` is optional. If omitted, the deploy agent skips the deploy command but still auto-merges the PR.
 
-**Supported test commands by stack:**
+**Supported test commands:**
 
 | Stack | test_command |
 |-------|-------------|
@@ -116,178 +196,33 @@ curl -X POST http://localhost:5001/repos \
 | Java Maven | `["mvn", "test"]` |
 | Ruby | `["bundle", "exec", "rspec"]` |
 
-### 3. Start the API
-
-```bash
-export GITHUB_TOKEN=your_personal_access_token
-./start.sh
-```
-
-The API runs on `http://localhost:5001`. You should see your registered repos printed on startup.
-
-### 4. Set up n8n
-
-**Import the workflows:**
-
-In n8n: **Workflows → Import from File**, import both files in order:
-1. `n8n-workflow-1-start.json` — triggers on new issues, starts the BA agent
-2. `n8n-workflow-2-approval.json` — handles all comment commands
-
-**Configure GitHub credentials:**
-
-In n8n: **Settings → Credentials → Add → GitHub API**
-- Add your GitHub Personal Access Token
-- Apply this credential to every GitHub node in both workflows (click each node → select credential)
-
-**Activate both workflows** (toggle the switch in the top right of each workflow).
-
-### 5. Set up GitHub webhook
-
-Start ngrok to expose n8n:
-
-```bash
-ngrok http 5678
-```
-
-In your GitHub repo: **Settings → Webhooks → Add webhook**
-
-| Field | Value |
-|-------|-------|
-| Payload URL | `https://your-ngrok-url/webhook/sdlc-start` |
-| Content type | `application/json` |
-| Events | Issues, Issue comments |
-
-> For multiple repos: add the same webhook URL to each repo. The pipeline reads `repository.owner.login` and `repository.name` from the payload automatically.
-
----
-
-## Adding a second (or third) repo
-
-No n8n changes needed. Just:
-
-1. Clone the repo locally
-2. Register it:
-
-```bash
-curl -X POST http://localhost:5001/repos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "owner": "other-org",
-    "repo": "other-repo",
-    "repo_path": "/path/to/other-repo",
-    "test_command": ["pytest"],
-    "main_branch": "main"
-  }'
-```
-
-3. Add the GitHub webhook to that repo (same ngrok URL)
-
-Done. The same API and n8n instance handles all repos.
-
----
-
-## Comment commands
-
-Post any of these as a comment on a GitHub issue to control the pipeline:
-
-| Comment | What it does |
-|---------|-------------|
-| `approve` | Advance to the next stage |
-| `revise: <feedback>` | Re-run the current stage's agent with your feedback |
-| `redo-dev: <instructions>` | Re-run the Dev agent with extra instructions |
-| `reopen: <reason>` | Reset pipeline back to BA with a reason |
-| `skip-qa` | Mark QA as approved without running the agent |
-| `assign: @username` | Assign all PM-created GitHub issues to a user |
-| `status` | Post a summary of the current pipeline state |
-
-**`revise:` works at every stage.** Examples:
-
-```
-revise: the scope is too broad, focus only on the API layer
-revise: split task 2 into two separate issues
-revise: the test coverage section misses the error cases
-```
-
----
-
-## API endpoints
-
-The API runs at `http://localhost:5001`.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/repos` | List registered repos |
-| POST | `/repos` | Register a new repo |
-| GET | `/session/<id>` | Inspect a pipeline session |
-| POST | `/ba-agent` | Run BA agent |
-| POST | `/sa-agent` | Run SA agent |
-| POST | `/pm-agent` | Run PM agent |
-| POST | `/dev-agent` | Run Dev agent |
-| POST | `/security-agent` | Run Security scan agent |
-| POST | `/review-agent` | Run Review agent |
-| POST | `/qa-agent` | Run QA agent |
-| POST | `/deploy-agent` | Run Deploy agent (`env=stage` or `env=prod`) |
-| GET  | `/metrics` | Pipeline metrics (sessions, retry rates, pass rates) |
-| POST | `/create-pr` | Create PR for existing branch |
-| POST | `/reopen` | Reset pipeline to BA |
-| POST | `/skip-qa` | Manually approve QA |
-| POST | `/assign` | Assign issues to a user |
-
-**Session ID format:** `{owner}-{repo}-{issue_number}`
-Example: `royalpinto007-ai-agent-test-repo-42`
-
-Inspect any session:
-```bash
-curl http://localhost:5001/session/royalpinto007-ai-agent-test-repo-42
-```
-
----
-
-## Project structure
-
-```
-sdlc-agent/
-├── agents/
-│   ├── ba/          # Business Analyst — BRD
-│   ├── sa/          # Solution Architect — SDD
-│   ├── pm/          # Project Manager — task breakdown + GitHub issues
-│   ├── dev/         # Developer — code, tests, PR
-│   ├── review/      # Peer Reviewer — code review
-│   └── qa/          # QA Engineer — sign-off + deployment gates
-├── shared/
-│   ├── claude.py    # Claude CLI wrapper
-│   ├── config.py    # repos.json loader
-│   ├── session.py   # session persistence
-│   └── utils.py     # git, file tree, GitHub API helpers
-├── sessions/        # per-issue session state (gitignored)
-├── repos.json       # registered repos
-├── sdlc_api.py      # Flask API
-├── start.sh         # startup script
-├── n8n-workflow-1-start.json
-└── n8n-workflow-2-approval.json
-```
-
 ---
 
 ## Troubleshooting
 
-**Pipeline doesn't start when I open an issue**
-- Check ngrok is running and the webhook URL matches `https://your-ngrok-url/webhook/sdlc-start`
+**Pipeline doesn't start when I assign the issue**
+- Check the webhook delivered: repo → Settings → Webhooks → Recent Deliveries
 - Check n8n workflow 1 is active (green toggle)
-- Check the API is running: `curl http://localhost:5001/repos`
+- Confirm the assignee username is exactly `support-accellier`
+- Check API: `curl http://localhost:5001/repos`
 
-**"Session not found" comment on the issue**
-- The approval webhook fired before BA completed, or the session was never created
-- Check the API logs for errors from the BA agent run
+**BA agent returns 500**
+- Check API logs: `journalctl -u sdlc-api -n 50`
+- Test Claude CLI: `claude -p "say hello"`
+- Test manually: `curl -X POST http://localhost:5001/ba-agent -H "Content-Type: application/json" -d '{"owner":"...","repo":"...","issue_number":1,"requirement":"test"}'`
+
+**Milestone not updating**
+- Check `GITHUB_TOKEN` in `/etc/sdlc-agent/env` has `repo` scope
+- Test: `curl -X POST http://localhost:5001/set-milestone -H "Content-Type: application/json" -d '{"owner":"Thrive-ERP","repo":"thrive-requirements","issue_number":1,"milestone_title":"BA Working"}'`
+
+**Dev agent tests fail**
+- Check `test_command` in `repos.json` matches how tests run in that repo
+- Ensure local clone has dependencies installed (`npm install` / `pip install -r requirements.txt`)
 
 **PR creation fails**
-- Make sure `GITHUB_TOKEN` is exported before running `start.sh`
-- Token needs `repo` scope
-- Run `curl -X POST http://localhost:5001/create-pr -H "Content-Type: application/json" -d '{"session_id": "owner-repo-42"}'` to retry without re-running dev
+- `GITHUB_TOKEN` needs `repo` scope with write access to the target repo
+- Retry without re-running dev: `curl -X POST http://localhost:5001/create-pr -H "Content-Type: application/json" -d '{"session_id":"owner-repo-42"}'`
 
-**Tests fail on dev agent**
-- Check `test_command` in `repos.json` matches how tests are run in that repo
-- Check the local clone has all dependencies installed (e.g. `npm install` or `pip install -r requirements.txt`)
-
-**Double comments on the issue**
-- In n8n, make sure there are no error-path wires connected to the comment nodes — delete any red error connections from agent nodes
+**Sessions directory fills up**
+- Safe to delete: `find /opt/sdlc-agent/sdlc-agent/sessions -name "*.json" -mtime +30 -delete`
+- A cron is added by `setup.sh` to do this nightly automatically
