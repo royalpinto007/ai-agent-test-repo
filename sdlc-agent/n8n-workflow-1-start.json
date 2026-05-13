@@ -12,18 +12,26 @@
       "name": "GitHub Issue Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "webhookId": "sdlc-start"
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false },
+          "options": {
+            "caseSensitive": false
+          },
           "conditions": [
             {
               "leftValue": "={{ $json.body.action }}",
               "rightValue": "opened",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -32,7 +40,10 @@
       "name": "IF Issue Opened",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
@@ -40,18 +51,47 @@
         "url": "http://10.68.103.135:5001/ba-agent",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"owner\": {{ JSON.stringify($json.body.repository.owner.login) }},\n  \"repo\": {{ JSON.stringify($json.body.repository.name) }},\n  \"issue_number\": {{ $json.body.issue.number }},\n  \"requirement\": {{ JSON.stringify($json.body.issue.title + '\\n\\n' + ($json.body.issue.body || '')) }}\n}",
-        "options": { "timeout": 300000 }
+        "specifyBody": "keypair",
+        "options": {
+          "timeout": 300000
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $json.body.issue.number }}"
+            },
+            {
+              "name": "requirement",
+              "value": "={{ $json.body.issue.title + \"\n\n\" + ($json.body.issue.body || \"\") }}"
+            }
+          ]
+        }
       },
       "id": "ba-agent",
       "name": "BA Agent",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 220]
+      "position": [
+        700,
+        220
+      ]
     },
     {
       "parameters": {
@@ -60,30 +100,61 @@
         "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+        "body": "=## \ud83e\udd16 BA Agent \u2014 Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
       },
       "id": "comment-brd",
       "name": "Comment BRD on Issue",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
-      "position": [940, 220]
+      "position": [
+        940,
+        220
+      ]
     }
   ],
   "connections": {
     "GitHub Issue Webhook": {
-      "main": [[{ "node": "IF Issue Opened", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "IF Issue Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "IF Issue Opened": {
       "main": [
-        [{ "node": "BA Agent", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "BA Agent": {
-      "main": [[{ "node": "Comment BRD on Issue", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Comment BRD on Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "staticData": null,
-  "tags": [{ "name": "sdlc" }]
+  "tags": [
+    {
+      "name": "sdlc"
+    }
+  ]
 }
