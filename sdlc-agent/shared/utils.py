@@ -276,6 +276,27 @@ def create_github_issue(owner, repo, token, title, body, labels=None, assignees=
         raise RuntimeError(f"GitHub API error {e.code}: {e.read().decode()}")
 
 
+def post_github_comment(owner, repo, issue_number, body, token):
+    """Post a comment on a GitHub issue. Returns the comment URL or None on error."""
+    import urllib.request
+    payload = json.dumps({"body": body}).encode()
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments",
+        data=payload,
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read()).get("html_url")
+    except Exception:
+        return None
+
+
 def get_github_issue_state(owner, repo, issue_number, token):
     """Return 'open' or 'closed' for a GitHub issue, or None on error."""
     import urllib.request
