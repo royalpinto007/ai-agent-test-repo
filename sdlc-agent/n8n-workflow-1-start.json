@@ -79,7 +79,7 @@
             },
             {
               "name": "requirement",
-              "value": "={{ $json.body.issue.title + \"\n\n\" + ($json.body.issue.body || \"\") }}"
+              "value": "={{ $json.body.issue.title + ' ' + ($json.body.issue.body ?? '') }}"
             }
           ]
         }
