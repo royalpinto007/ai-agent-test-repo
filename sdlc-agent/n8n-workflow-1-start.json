@@ -26,7 +26,7 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ ($json.body.action === 'opened' || $json.body.action === 'assigned') && ($json.body.issue.assignees || []).some(a => a.login === 'support-accellier') }}",
+              "leftValue": "={{ ($json.body.action === 'opened' || $json.body.action === 'assigned') && ($json.body.issue.assignees || []).some(a => a.login === 'agent-accellier') }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
