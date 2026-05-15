@@ -3,7 +3,7 @@ def bug_analysis_prompt(issue_title, issue_description, file_contents, file_tree
         f"FILE: {path}\n```\n{content}\n```"
         for path, content in file_contents.items()
     )
-    return f"""You're a senior engineer performing a thorough bug analysis. Read the codebase carefully, then produce a structured report covering all five sections below. Be direct and specific — name actual files, functions, and line ranges.
+    return f"""You're a senior engineer performing a bug analysis. Output ONLY the structured report below — no prose, no padding.
 
 BUG TITLE: {issue_title}
 
@@ -18,20 +18,25 @@ RELEVANT FILES:
 
 ---
 
-## 1. Issue Clarification
-Fully describe the bug as you understand it. What is the expected behaviour? What is the actual behaviour? Who is affected and under what conditions? Identify any ambiguity in the report and state your assumptions.
+## 🐛 Issue Clarification
+[2-3 sentences describing the bug clearly — expected vs actual behaviour, who is affected]
 
-## 2. Issue Verification
-List the exact steps to confirm this bug is reproducible. Include environment requirements, preconditions, and expected vs actual output at each step. If automated tests exist, name which ones cover this area.
+## 🔍 Verification Steps
+1. [step]
+2. [step]
+(max 5 steps — include preconditions and expected vs actual output)
 
-## 3. Cause Determination
-Identify the root cause in the codebase. Name the specific file(s), function(s), and line(s) where the defect lives. Explain the chain of events from trigger to symptom.
+## 🔎 Root Cause
+[1-2 sentences on likely cause + specific file/function/line if known]
 
-## 4. Cause Verification
-How would you confirm you've found the right root cause? Describe a targeted test or diagnostic step (e.g. adding a log, running a specific unit test, checking a specific DB query) that isolates the faulty logic.
+## ✅ Cause Verification
+- [how to confirm the root cause — targeted test, log, or diagnostic step]
+(max 3 bullets)
 
-## 5. Possible Solution
-Propose 2–3 concrete fix approaches. For each: what changes are needed, which files are affected, and what the trade-off is (simplicity vs completeness, risk of regression, etc.). Recommend one.
+## 🛠️ Proposed Fix
+**Option A:** [one line]
+**Option B:** [one line]
+Recommendation: Option [A/B] — [one line reason]
 """
 
 
@@ -40,7 +45,7 @@ def system_analysis_prompt(requirement, file_tree, file_contents):
         f"FILE: {path}\n```\n{content}\n```"
         for path, content in file_contents.items()
     )
-    return f"""You're a Business Analyst looking at a new requirement. Read the relevant code first, then write a brief, honest briefing — like you're explaining to a teammate what exists and what's missing.
+    return f"""You're a Business Analyst reviewing a new requirement. Output ONLY the structured report below — no prose, no padding.
 
 REQUIREMENT: {requirement}
 
@@ -50,20 +55,24 @@ FILE TREE:
 RELEVANT FILES:
 {files_section}
 
-Write proportionally to the complexity. A small bug fix = 2-3 short paragraphs. A bigger feature = more detail. Don't pad.
+---
 
-**What exists today** — what does the current code do in this area? Name specific functions/files.
+## 📦 What Exists Today
+- [specific function/file and what it does — one bullet per relevant item]
 
-**What's missing or broken** — the actual gap between now and what's needed.
+## 🔧 What's Missing or Broken
+- [the actual gap between current code and the requirement]
 
-**Type of change** — bug fix, small enhancement, new feature, or something bigger?
+## 🏷️ Type of Change
+Bug fix / Small enhancement / New feature / Large feature — [one line reason]
 
-**Obvious risks** — anything that looks tricky? Keep it to things that genuinely matter.
+## ⚠️ Obvious Risks
+- [only things that genuinely matter — skip if none]
 """
 
 
 def brd_prompt(requirement, system_analysis, file_tree):
-    return f"""You're writing up requirements for a development team. Be direct and clear — write for a smart developer, not a committee.
+    return f"""You're writing requirements for a development team. Output ONLY the structured report below — no prose, no padding.
 
 REQUIREMENT: {requirement}
 
@@ -73,24 +82,32 @@ YOUR ANALYSIS:
 FILE TREE:
 {file_tree}
 
-**Scale your output to the complexity of the change.** A simple bug fix needs half a page. A multi-part feature needs more. Skip any section where you'd just write N/A.
-
 ---
 
-**What we're building and why**
-1-3 sentences. What is this, and what does success look like?
+## 🎯 What
+[1-2 sentences max — what is this and what does success look like]
 
-**Current behaviour vs required behaviour**
-Be specific — name the actual functions and files. What happens today vs what should happen after this ships?
+## 💡 Why
+[1 sentence — the business or user reason]
 
-**Acceptance criteria**
-Every testable requirement as Given/When/Then. Include error cases and edge cases. For a tiny change, a short bullet list is fine.
+## 👤 Who
+[one line — who is affected or benefits]
 
-**What needs to be built**
-The actual dev items. For each: what it is, which files change, rough size (trivial / small / medium / large). If it's a config-only change, say so.
+## ✅ Acceptance Criteria
+- [ ] [criterion]
+- [ ] [criterion]
+(max 6 bullets — testable, include error cases)
 
-**Open questions** *(only if something would actually block us)*
-If you have none, say "None — good to go."
+## 🚫 Out of Scope
+- [item]
+(max 4 bullets — omit section if none)
+
+## ⚙️ Config Only?
+Yes / No — [one line reason]
+
+## ❓ Open Questions
+- [question] — Blocking: Yes/No
+(max 3 questions — omit section if none)
 
 Finally, on the very last line of your response, write exactly one of:
 CONFIG_ONLY: true
@@ -116,7 +133,7 @@ ANSWERS:
 FILE TREE:
 {file_tree}
 
-Update every part of the BRD affected by the answers. Resolve the open questions. If an answer opens up a genuinely new blocking question, add it. Otherwise mark open questions as resolved and return the updated BRD.
+Update every part of the BRD affected by the answers. Resolve the open questions. If an answer opens up a genuinely new blocking question, add it. Otherwise mark open questions as resolved and return the updated BRD using the same structured format.
 """
 
 
@@ -136,5 +153,5 @@ FEEDBACK:
 FILE TREE:
 {file_tree}
 
-Address every point. If scope changes, update the acceptance criteria and dev items. Return the updated BRD.
+Address every point. If scope changes, update the acceptance criteria and dev items. Return the updated BRD using the same structured format.
 """

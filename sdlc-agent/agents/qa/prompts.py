@@ -5,7 +5,7 @@ def qa_prompt(issue_title, test_output, review_verdict, review_dimensions, impac
         for k, v in (review_dimensions or {}).items()
     )
     sdd_section = f"\nSOLUTION DESIGN:\n{sdd}" if sdd else ""
-    return f"""You're QA giving final sign-off. Be proportional — a small bug fix needs a quick check, a complex feature needs thorough verification.
+    return f"""You're QA giving final sign-off. Output ONLY the structured report below — no prose, no padding.
 
 TASK: {issue_title}
 
@@ -22,49 +22,25 @@ TEST RESULTS:
 
 ---
 
-## 1. Acceptance Criteria Check
+## 🧪 QA Summary
+**Result:** ✅ Pass / ⚠️ Pass with notes / ❌ Fail
 
-Did the implementation satisfy each criterion? MET / NOT MET / PARTIAL, with evidence (test name or code reference).
+## Test Coverage
+| Area | Tested | Result |
+|------|--------|--------|
+| [area] | Yes/No | ✅/❌ |
 
-## 2. Test Coverage
+## 🐛 Issues Found
+- **[severity]** [one line description]
+(omit section if none)
 
-What's covered and what's missing? Focus on gaps that could fail in production — edge cases, boundary values, error conditions. If it's solid, say so briefly.
+## 📋 Sign-off Checklist
+- [x] Tests pass
+- [x] No regressions
+- [ ] [any outstanding item]
 
-## 3. Peer Review Follow-up
-
-Were blocking issues from the reviewer resolved? For each: RESOLVED / UNRESOLVED / PARTIAL.
-
-## 5. Regression Risk
-
-What could have been affected? Risk level? Covered by tests? One line is enough for a small isolated change.
-
-## 6. Deployment Gate: STAGE
-
-- [ ] Tests passing
-- [ ] Acceptance criteria met
-- [ ] High-risk gaps addressed
-- [ ] Peer review issues resolved
-
-**STAGE Gate: OPEN / BLOCKED**
-
-What to manually verify on STAGE (be specific).
-
-## 7. Deployment Gate: PRODUCTION
-
-- [ ] STAGE gate passed and verified
-- [ ] No new errors in STAGE logs
-- [ ] Rollback plan confirmed
-
-**PROD Gate: OPEN / BLOCKED**
-
-**Rollback:** exact steps to revert if needed.
-
-## 8. QA Verdict
-
-**APPROVED** or **REJECTED**
-
-If APPROVED: confidence (HIGH / MEDIUM / LOW) and any conditions.
-If REJECTED: what must be fixed and who fixes it.
+## 🚀 Deploy Recommendation
+Go / No-go — [one line reason including rollback note if No-go]
 """
 
 
@@ -79,5 +55,5 @@ YOUR QA REPORT:
 FEEDBACK:
 {human_feedback}
 
-Address the feedback. If it resolves blocking issues, update gate statuses and verdict. Return the updated report.
+Address the feedback. If it resolves blocking issues, update the checklist and deploy recommendation. Return the updated report using the same structured format.
 """

@@ -1,7 +1,5 @@
 def solution_design_prompt(brd, system_analysis, file_tree):
-    return f"""You're a Solution Architect writing a technical design. Your job is to give developers a clear enough picture that they can implement without guessing — but don't over-engineer it.
-
-**Scale to the complexity.** A simple bug fix might just need "change this function to do X, here's why". A new subsystem needs a full design. Skip sections that don't apply.
+    return f"""You're a Solution Architect writing a technical design. Output ONLY the structured report below — no prose, no padding.
 
 SYSTEM ANALYSIS:
 {system_analysis}
@@ -14,31 +12,32 @@ FILE TREE:
 
 ---
 
-**What we're changing and why**
-Plain English — what is the problem and what's the approach? If you considered alternatives, mention them briefly and why you rejected them.
+## 🏗️ Components Affected
+| Component | File/Module | Change Type |
+|-----------|-------------|-------------|
+| [name]    | [path]      | Add/Modify/Remove |
 
-**Files and components involved**
-Which files change, which are new, which are untouched. For any file that changes, say what specifically changes.
+## 📋 Changes Required
+**[Component name]**
+- [change 1]
+- [change 2]
 
-**How it works — technical detail**
-For each function being added or changed:
-- What it does, its signature, inputs/outputs
-- The key logic — algorithm, edge cases, error conditions
-- Why this approach (if non-obvious)
+(repeat per component, max 3 components shown in detail)
 
-For a trivial change (e.g. add a null check) this can be one sentence. For a new algorithm, be thorough.
+## ⚠️ Risks
+- [risk] — Mitigation: [one line]
+(max 3 risks — omit section if none)
 
-**Interface changes** *(if any)*
-Before → After for any function that changes its signature. Who calls it?
+## 🧪 Test Cases
+- [ ] [test case]
+(max 6 test cases — focus on cases a developer might miss)
 
-**Error handling**
-How are error cases handled? Be specific about what throws, what's caught, what the user/caller sees.
+## 🔗 Dependencies
+- [dependency or "None"]
 
-**Tests needed**
-What to test — happy path, edge cases, error conditions. Don't list tests you're confident the developer will write anyway; focus on cases they might miss.
-
-**Open questions** *(only if genuinely blocking)*
-If none: "None — ready to implement."
+## ❓ Open Questions
+- [question] — Blocking: Yes/No
+(omit section if none — otherwise: "None — ready to implement.")
 """
 
 
@@ -57,5 +56,5 @@ FEEDBACK:
 FILE TREE:
 {file_tree}
 
-Address every point. If you disagree with something, say so briefly and explain your reasoning. Return the updated design.
+Address every point. If you disagree with something, say so briefly and explain your reasoning. Return the updated design using the same structured format.
 """

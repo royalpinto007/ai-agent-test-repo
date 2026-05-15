@@ -1,8 +1,6 @@
 def review_prompt(issue_title, diff, impact_analysis, test_diff, affected_files, codebase_analysis="", pr_description=""):
     affected_section = "\n".join(f"- {f}" for f in affected_files) if affected_files else "None"
-    return f"""Review this code change. Be direct — say what's wrong and why, or say it looks good. Reference specific lines/functions.
-
-Scale your review to the change. A one-line bug fix doesn't need a 10-section report. A big feature change does.
+    return f"""Review this code change. Output ONLY the structured report below — no prose, no padding.
 
 TASK: {issue_title}
 
@@ -23,46 +21,25 @@ TEST DIFF:
 
 ---
 
-**What was changed** — quick summary of what the diff actually does.
+## 🔍 Review Summary
+**Verdict:** ✅ Approved / ⚠️ Needs Changes / ❌ Rejected
 
-## 2. Correctness
-**Status: PASS / FAIL**
-Does it actually solve the task? Any logic errors, missing branches, wrong conditions? Are all acceptance criteria satisfied?
-If none: "Looks correct."
+## 📁 Files Reviewed
+| File | Status | Notes |
+|------|--------|-------|
+| [file] | ✅ OK / ⚠️ Issue / ❌ Problem | [one line] |
 
-## 3. Security
-**Status: PASS / FAIL**
-Input validation, injection risks, exposed secrets, unsafe operations? Only flag things relevant to this change.
-If none: "No security concerns."
+## 🐛 Issues Found
+- **[severity: Critical/Major/Minor]** `[file:line]` — [one line description]
+(list only — omit section if none)
 
-## 4. Performance
-**Status: PASS / FAIL**
-Obvious inefficiencies? Only flag things that actually matter at scale.
-If none: "No performance concerns."
+## ✅ What's Good
+- [one line]
+(max 3 bullets — omit section if nothing noteworthy)
 
-## 5. Error Handling
-**Status: PASS / FAIL**
-Are errors caught and handled properly? Silent failures? Missing validation?
-If none: "Error handling looks good."
-
-## 6. Test Coverage
-**Status: PASS / FAIL**
-Are the important cases tested? Missing edge cases or error conditions?
-If none: "Tests cover what they need to."
-
-## 8. Blocking Issues
-Things that must be fixed before this merges. Only real bugs, security issues, or missing tests for acceptance criteria — not style nits.
-
-If none: "None — approved to merge."
-
-## 9. Suggestions *(optional)*
-Non-blocking improvements worth mentioning. Skip this section if there's nothing worth saying.
-
-## 10. Verdict
-**PASS** or **FAIL**
-
-## Summary
-One or two sentences: overall quality and what to do next.
+## 🔧 Required Changes
+- [ ] [specific actionable change]
+(omit section if Approved)
 """
 
 
@@ -83,14 +60,7 @@ UPDATED CODE DIFF:
 UPDATED TEST DIFF:
 {new_test_diff}
 
-Re-review the changes:
-1. For each blocking issue from your original review — is it now fixed? (YES / NO / PARTIAL)
-2. Were any new issues introduced by the fixes?
-3. Did the developer address the human reviewer's feedback?
-
-Use the same section headings as the original review.
-Focus on changes — you do not need to re-review unchanged code.
-Update the Verdict based on what remains.
+Re-review the changes using the same structured format. For each blocking issue from your original review — is it now fixed? (YES / NO / PARTIAL). Flag any new issues introduced. Update the Verdict accordingly.
 """
 
 
@@ -108,5 +78,5 @@ CURRENT DIFF:
 HUMAN FEEDBACK:
 {human_feedback}
 
-Update your code review to address the feedback. If the feedback overrides a FAIL verdict, change it to PASS and explain why the concern is addressed. Return the complete updated review using the same section numbering.
+Update your code review to address the feedback. If the feedback overrides a Rejected verdict, change it to Approved and explain why the concern is addressed. Return the complete updated review using the same structured format.
 """
