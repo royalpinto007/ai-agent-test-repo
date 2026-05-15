@@ -1,0 +1,63 @@
+name: Bug
+description: Report a bug or defect in the system
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in the details below. The AI pipeline will start automatically once `agent-accellier` is assigned.
+
+  - type: textarea
+    id: what-broke
+    attributes:
+      label: What is broken?
+      description: Describe what is happening that shouldn't be.
+      placeholder: e.g. When I open the Ready to Ship screen, the order list is empty even though there are validated shipments.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps to trigger the bug.
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What should happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What actually happens?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which version of the software is affected?
+      placeholder: e.g. Dolibarr v22.0.4
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, logs, related issues, or any other relevant information. Do not include secrets or tokens.
+    validations:
+      required: false

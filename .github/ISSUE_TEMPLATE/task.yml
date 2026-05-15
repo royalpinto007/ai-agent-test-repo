@@ -1,0 +1,62 @@
+name: Task
+description: A specific task assigned directly to one pipeline stage
+title: "[Dev] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tasks are routed directly to a specific pipeline stage — no full BA→SA→PM flow.
+        **Change the title prefix** to match the stage you want:
+
+        | Prefix | Runs |
+        |--------|------|
+        | `[BA]` | BA agent only |
+        | `[SA]` | SA agent only |
+        | `[PM]` | PM agent only |
+        | `[Dev]` | Dev → Review → QA |
+        | `[Review]` | Review → QA |
+        | `[QA]` | QA only |
+        | `[Deploy]` | Deploy only |
+
+        The pipeline starts automatically once `agent-accellier` is assigned.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Task description
+      description: What needs to be done? Be specific — this goes directly to the agent with no prior analysis.
+      placeholder: e.g. The config validation in delivery_carrier.py is not checking for empty account_number. Add validation and return a user-visible error.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How do we know this task is done?
+      placeholder: |
+        - Saving a carrier with empty account_number shows a validation error
+        - Existing carriers with valid account_number are unaffected
+        - Unit test covers both cases
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Relevant files or areas
+      description: Which files, modules, or areas of the codebase are affected? Helps the agent focus.
+      placeholder: |
+        - thrive/addons/delivery/models/delivery_carrier.py
+        - thrive/addons/delivery/views/delivery_carrier_view.xml
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other relevant information, constraints, or related issues.
+    validations:
+      required: false

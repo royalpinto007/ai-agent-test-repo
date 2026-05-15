@@ -1,0 +1,80 @@
+name: Feature
+description: Request a new feature or enhancement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in the details below. The AI pipeline will start automatically once `agent-accellier` is assigned.
+        If the requirement can be satisfied through configuration only (no code change), the pipeline will detect that and skip development.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What are we building?
+      description: One clear sentence on what the feature does.
+      placeholder: e.g. Add real-time FedEx shipping rates to the delivery module so users can get live rates at checkout.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it needed?
+      description: What problem does this solve? What value does it add?
+      placeholder: e.g. Currently all delivery costs are entered manually. Sales reps look up FedEx rates separately and type them in, causing errors.
+    validations:
+      required: true
+
+  - type: input
+    id: who
+    attributes:
+      label: Who uses it?
+      description: Which user type — end user, admin, warehouse operator, etc.
+      placeholder: e.g. Warehouse operators and sales reps
+    validations:
+      required: true
+
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Expected behaviour
+      description: Bullet each expected behaviour or flow. Include edge cases you already know about.
+      placeholder: |
+        - At checkout, the wizard shows live FedEx rates for the order
+        - Operator selects a rate and it is added to the order
+        - If FedEx API returns an error, show the error message — don't silently fail
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What should the agent explicitly NOT build?
+      placeholder: |
+        - UPS or DHL integration
+        - Label printing infrastructure
+    validations:
+      required: false
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Technical constraints, existing systems to integrate with, versions, or dependencies.
+      placeholder: |
+        - Must work with the existing delivery.carrier model
+        - Dolibarr v22.0.4
+        - API credentials must be configurable per carrier, not hardcoded
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Related issues, existing code references, third-party API docs, or design decisions. No secrets or tokens.
+    validations:
+      required: false
