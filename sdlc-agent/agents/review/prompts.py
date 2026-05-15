@@ -21,23 +21,23 @@ TEST DIFF:
 
 ---
 
-## 🔍 Review Summary
-**Verdict:** ✅ Approved / ⚠️ Needs Changes / ❌ Rejected
+## Review Summary
+**Verdict:** Approved / Needs Changes / Rejected
 
-## 📁 Files Reviewed
+## Files Reviewed
 | File | Status | Notes |
 |------|--------|-------|
-| [file] | ✅ OK / ⚠️ Issue / ❌ Problem | [one line] |
+| [file] | OK / Issue / Problem | [one line] |
 
-## 🐛 Issues Found
+## Issues Found
 - **[severity: Critical/Major/Minor]** `[file:line]` — [one line description]
 (list only — omit section if none)
 
-## ✅ What's Good
+## What's Good
 - [one line]
 (max 3 bullets — omit section if nothing noteworthy)
 
-## 🔧 Required Changes
+## Required Changes
 - [ ] [specific actionable change]
 (omit section if Approved)
 """

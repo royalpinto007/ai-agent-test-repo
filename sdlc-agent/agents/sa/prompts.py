@@ -12,30 +12,30 @@ FILE TREE:
 
 ---
 
-## 🏗️ Components Affected
+## Components Affected
 | Component | File/Module | Change Type |
 |-----------|-------------|-------------|
 | [name]    | [path]      | Add/Modify/Remove |
 
-## 📋 Changes Required
+## Changes Required
 **[Component name]**
 - [change 1]
 - [change 2]
 
 (repeat per component, max 3 components shown in detail)
 
-## ⚠️ Risks
+## Risks
 - [risk] — Mitigation: [one line]
 (max 3 risks — omit section if none)
 
-## 🧪 Test Cases
+## Test Cases
 - [ ] [test case]
 (max 6 test cases — focus on cases a developer might miss)
 
-## 🔗 Dependencies
+## Dependencies
 - [dependency or "None"]
 
-## ❓ Open Questions
+## Open Questions
 - [question] — Blocking: Yes/No
 (omit section if none — otherwise: "None — ready to implement.")
 """

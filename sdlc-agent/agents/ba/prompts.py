@@ -18,22 +18,22 @@ RELEVANT FILES:
 
 ---
 
-## 🐛 Issue Clarification
+## Issue Clarification
 [2-3 sentences describing the bug clearly — expected vs actual behaviour, who is affected]
 
-## 🔍 Verification Steps
+## Verification Steps
 1. [step]
 2. [step]
 (max 5 steps — include preconditions and expected vs actual output)
 
-## 🔎 Root Cause
+## Root Cause
 [1-2 sentences on likely cause + specific file/function/line if known]
 
-## ✅ Cause Verification
+## Cause Verification
 - [how to confirm the root cause — targeted test, log, or diagnostic step]
 (max 3 bullets)
 
-## 🛠️ Proposed Fix
+## Proposed Fix
 **Option A:** [one line]
 **Option B:** [one line]
 Recommendation: Option [A/B] — [one line reason]
@@ -57,16 +57,16 @@ RELEVANT FILES:
 
 ---
 
-## 📦 What Exists Today
+## What Exists Today
 - [specific function/file and what it does — one bullet per relevant item]
 
-## 🔧 What's Missing or Broken
+## What's Missing or Broken
 - [the actual gap between current code and the requirement]
 
-## 🏷️ Type of Change
+## Type of Change
 Bug fix / Small enhancement / New feature / Large feature — [one line reason]
 
-## ⚠️ Obvious Risks
+## Obvious Risks
 - [only things that genuinely matter — skip if none]
 """
 
@@ -84,28 +84,28 @@ FILE TREE:
 
 ---
 
-## 🎯 What
+## What
 [1-2 sentences max — what is this and what does success look like]
 
-## 💡 Why
+## Why
 [1 sentence — the business or user reason]
 
-## 👤 Who
+## Who
 [one line — who is affected or benefits]
 
-## ✅ Acceptance Criteria
+## Acceptance Criteria
 - [ ] [criterion]
 - [ ] [criterion]
 (max 6 bullets — testable, include error cases)
 
-## 🚫 Out of Scope
+## Out of Scope
 - [item]
 (max 4 bullets — omit section if none)
 
-## ⚙️ Config Only?
+## Config Only?
 Yes / No — [one line reason]
 
-## ❓ Open Questions
+## Open Questions
 - [question] — Blocking: Yes/No
 (max 3 questions — omit section if none)
 

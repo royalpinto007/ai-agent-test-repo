@@ -22,24 +22,24 @@ TEST RESULTS:
 
 ---
 
-## 🧪 QA Summary
-**Result:** ✅ Pass / ⚠️ Pass with notes / ❌ Fail
+## QA Summary
+**Result:** Pass / Pass with notes / Fail
 
 ## Test Coverage
 | Area | Tested | Result |
 |------|--------|--------|
-| [area] | Yes/No | ✅/❌ |
+| [area] | Yes/No | Pass/Fail |
 
-## 🐛 Issues Found
+## Issues Found
 - **[severity]** [one line description]
 (omit section if none)
 
-## 📋 Sign-off Checklist
+## Sign-off Checklist
 - [x] Tests pass
 - [x] No regressions
 - [ ] [any outstanding item]
 
-## 🚀 Deploy Recommendation
+## Deploy Recommendation
 Go / No-go — [one line reason including rollback note if No-go]
 """
 

@@ -19,7 +19,7 @@ FILE TREE:
 {other_repos_section}
 ---
 
-## 📋 Task Breakdown
+## Task Breakdown
 
 | # | Title | Type | Effort | Priority | Depends On |
 |---|-------|------|--------|----------|------------|
@@ -46,7 +46,7 @@ Then emit the full task JSON block required for issue creation:
 ]
 ```
 
-## 🔗 Cross-Repo Impact
+## Cross-Repo Impact
 | Repo | Change Needed |
 |------|--------------|
 | [repo] | [one line] |
@@ -67,7 +67,7 @@ If repos are affected, also emit a JSON block:
 ]
 ```
 
-## ⚡ Recommendation
+## Recommendation
 [1-2 sentences on sequencing, priority callouts, or what's blocking — write "None — ready to go." if nothing is blocking]
 """
 
