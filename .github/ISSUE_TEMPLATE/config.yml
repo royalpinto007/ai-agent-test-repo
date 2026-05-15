@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Pipeline reference
-    url: https://github.com/royalpinto007/ai-agent-test-repo/blob/main/PIPELINE_REFERENCE.md
+    url: https://github.com/Thrive-ERP/thrive-requirements/blob/main/PIPELINE_REFERENCE.md
     about: How the AI pipeline works
   - name: Issue writing guide
-    url: https://github.com/royalpinto007/ai-agent-test-repo/blob/main/ISSUE_GUIDE.md
+    url: https://github.com/Thrive-ERP/thrive-requirements/blob/main/ISSUE_GUIDE.md
     about: How to write good issues for best results
