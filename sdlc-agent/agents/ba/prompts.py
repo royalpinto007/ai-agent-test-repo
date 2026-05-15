@@ -1,3 +1,40 @@
+def bug_analysis_prompt(issue_title, issue_description, file_contents, file_tree_str):
+    files_section = "\n\n".join(
+        f"FILE: {path}\n```\n{content}\n```"
+        for path, content in file_contents.items()
+    )
+    return f"""You're a senior engineer performing a thorough bug analysis. Read the codebase carefully, then produce a structured report covering all five sections below. Be direct and specific — name actual files, functions, and line ranges.
+
+BUG TITLE: {issue_title}
+
+BUG DESCRIPTION:
+{issue_description}
+
+FILE TREE:
+{file_tree_str}
+
+RELEVANT FILES:
+{files_section}
+
+---
+
+## 1. Issue Clarification
+Fully describe the bug as you understand it. What is the expected behaviour? What is the actual behaviour? Who is affected and under what conditions? Identify any ambiguity in the report and state your assumptions.
+
+## 2. Issue Verification
+List the exact steps to confirm this bug is reproducible. Include environment requirements, preconditions, and expected vs actual output at each step. If automated tests exist, name which ones cover this area.
+
+## 3. Cause Determination
+Identify the root cause in the codebase. Name the specific file(s), function(s), and line(s) where the defect lives. Explain the chain of events from trigger to symptom.
+
+## 4. Cause Verification
+How would you confirm you've found the right root cause? Describe a targeted test or diagnostic step (e.g. adding a log, running a specific unit test, checking a specific DB query) that isolates the faulty logic.
+
+## 5. Possible Solution
+Propose 2–3 concrete fix approaches. For each: what changes are needed, which files are affected, and what the trade-off is (simplicity vs completeness, risk of regression, etc.). Recommend one.
+"""
+
+
 def system_analysis_prompt(requirement, file_tree, file_contents):
     files_section = "\n\n".join(
         f"FILE: {path}\n```\n{content}\n```"
@@ -54,6 +91,12 @@ The actual dev items. For each: what it is, which files change, rough size (triv
 
 **Open questions** *(only if something would actually block us)*
 If you have none, say "None — good to go."
+
+Finally, on the very last line of your response, write exactly one of:
+CONFIG_ONLY: true
+CONFIG_ONLY: false
+
+Write `CONFIG_ONLY: true` only if the requirement can be satisfied entirely through configuration with no code changes needed. Otherwise write `CONFIG_ONLY: false`.
 """
 
 

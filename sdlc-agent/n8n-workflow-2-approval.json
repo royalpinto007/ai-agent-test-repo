@@ -317,11 +317,43 @@
               "conditions": {
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.session.stage }}",
-                    "rightValue": "ba",
+                    "leftValue": "={{ $json.session.issue_type === 'Bug' && $json.session.stage === 'ba' }}",
+                    "rightValue": true,
                     "operator": {
-                      "type": "string",
-                      "operation": "equals"
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "bug-ba-to-dev"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.session.issue_type === 'Bug' && $json.session.stage === 'dev' }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "bug-dev-to-deploy"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'ba' }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
                     }
                   }
                 ]
@@ -333,11 +365,11 @@
               "conditions": {
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.session.stage }}",
-                    "rightValue": "sa",
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'sa' }}",
+                    "rightValue": true,
                     "operator": {
-                      "type": "string",
-                      "operation": "equals"
+                      "type": "boolean",
+                      "operation": "true"
                     }
                   }
                 ]
@@ -349,11 +381,11 @@
               "conditions": {
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.session.stage }}",
-                    "rightValue": "pm",
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'pm' && !$json.session.config_only }}",
+                    "rightValue": true,
                     "operator": {
-                      "type": "string",
-                      "operation": "equals"
+                      "type": "boolean",
+                      "operation": "true"
                     }
                   }
                 ]
@@ -365,11 +397,43 @@
               "conditions": {
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.session.stage }}",
-                    "rightValue": "dev",
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'dev' && !$json.session.config_only }}",
+                    "rightValue": true,
                     "operator": {
-                      "type": "string",
-                      "operation": "equals"
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "review"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'review' }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "qa"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ ($json.session.issue_type === 'Feature' || !$json.session.issue_type) && $json.session.stage === 'qa' }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
                     }
                   }
                 ]
@@ -381,11 +445,11 @@
               "conditions": {
                 "conditions": [
                   {
-                    "leftValue": "={{ $json.session.stage }}",
-                    "rightValue": "deploy-stage",
+                    "leftValue": "={{ $json.session.stage === 'deploy-stage' }}",
+                    "rightValue": true,
                     "operator": {
-                      "type": "string",
-                      "operation": "equals"
+                      "type": "boolean",
+                      "operation": "true"
                     }
                   }
                 ]
@@ -1410,6 +1474,537 @@
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
         "body": "=## 🎉 Production Deployment — {{ $json.overall_ok ? '✅ Complete' : '❌ Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '✅' : '❌' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '✅ Passed' : '❌ Failed' }}\n{{ $json.release_url ? '**Release:** ' + $json.release_url : '' }}\n{{ $json.branch_deleted ? '**Branch:** Cleaned up ✅' : '' }}\n\n{{ $json.overall_ok ? '🏁 Pipeline complete.' : 'Fix deploy issues and comment `approve` to retry.' }}"
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Dev Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-bug-dev-working",
+      "name": "Set Milestone Bug Dev Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -1300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/dev-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\"\n}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "bug-dev-agent",
+      "name": "Bug Dev Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        -1300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 💻 Dev Agent — Bug Fix {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.pr_url ? '**PR:** ' + $json.pr_url : '' }}\n\n**Next step:** Comment `approve` to deploy."
+      },
+      "id": "comment-bug-dev",
+      "name": "Comment Bug Dev Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -1300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Dev Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-bug-dev-awaiting",
+      "name": "Set Milestone Bug Dev Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        -1300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Review Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-review-working",
+      "name": "Set Milestone Review Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "review-agent",
+      "name": "Review Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## 🔍 Review Agent — Code Review\n\n**Verdict:** {{ $json.verdict === 'PASS' ? '✅ PASS' : '❌ FAIL' }}\n\n**Next step:** Comment `approve` to proceed to QA."
+      },
+      "id": "comment-review",
+      "name": "Comment Review Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Review Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-review-awaiting",
+      "name": "Set Milestone Review Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        -620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Test Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-qa-working",
+      "name": "Set Milestone Test Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "qa-agent",
+      "name": "QA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
+        "body": "=## ✅ QA Agent — Test Report\n\n**Approved:** {{ $json.approved ? '✅ Yes' : '❌ No' }}\n**Stage gate:** {{ $json.stage_gate }}\n\n**Next step:** Comment `approve` to deploy to stage."
+      },
+      "id": "comment-qa",
+      "name": "Comment QA Result",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Test Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-qa-awaiting",
+      "name": "Set Milestone Test Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        -460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "TRD Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-trd-working",
+      "name": "Set Milestone TRD Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -1100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "TRD Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-trd-awaiting",
+      "name": "Set Milestone TRD Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        -1100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Planning Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-planning-working",
+      "name": "Set Milestone Planning Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        -940
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Planning Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-planning-awaiting",
+      "name": "Set Milestone Planning Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        -940
+      ]
     }
   ],
   "connections": {
@@ -1580,14 +2175,28 @@
       "main": [
         [
           {
-            "node": "Set Milestone SA Working",
+            "node": "Set Milestone Bug Dev Working",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Set Milestone PM Working",
+            "node": "Set Milestone Deploy Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone TRD Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Planning Working",
             "type": "main",
             "index": 0
           }
@@ -1595,6 +2204,20 @@
         [
           {
             "node": "Set Milestone DEV Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Review Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Test Working",
             "type": "main",
             "index": 0
           }
@@ -1609,6 +2232,127 @@
         [
           {
             "node": "Call Deploy Prod Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Bug Dev Working": {
+      "main": [
+        [
+          {
+            "node": "Bug Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bug Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment Bug Dev Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Bug Dev Result": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Bug Dev Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone TRD Working": {
+      "main": [
+        [
+          {
+            "node": "SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Planning Working": {
+      "main": [
+        [
+          {
+            "node": "PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Review Working": {
+      "main": [
+        [
+          {
+            "node": "Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment Review Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Review Result": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Review Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Test Working": {
+      "main": [
+        [
+          {
+            "node": "QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Comment QA Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment QA Result": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Test Awaiting Approval",
             "type": "main",
             "index": 0
           }
@@ -1640,17 +2384,6 @@
         ]
       ]
     },
-    "Set Milestone SA Working": {
-      "main": [
-        [
-          {
-            "node": "SA Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "SA Agent": {
       "main": [
         [
@@ -1666,18 +2399,7 @@
       "main": [
         [
           {
-            "node": "Set Milestone SA Awaiting Approval",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Set Milestone PM Working": {
-      "main": [
-        [
-          {
-            "node": "PM Agent",
+            "node": "Set Milestone TRD Awaiting Approval",
             "type": "main",
             "index": 0
           }
@@ -1699,7 +2421,7 @@
       "main": [
         [
           {
-            "node": "Set Milestone PM Awaiting Approval",
+            "node": "Set Milestone Planning Awaiting Approval",
             "type": "main",
             "index": 0
           }

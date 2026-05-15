@@ -1,7 +1,7 @@
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, read_file, grep_repo, identify_relevant_files, run_git
 from shared.session import save_session, load_session
-from agents.ba.prompts import system_analysis_prompt, brd_prompt, followup_prompt, revision_prompt
+from agents.ba.prompts import system_analysis_prompt, brd_prompt, followup_prompt, revision_prompt, bug_analysis_prompt
 
 
 def _load_relevant_files(requirement, repo_path, file_tree):
@@ -52,9 +52,19 @@ def _has_open_questions(brd):
     return "none" not in tail and "fully specified" not in tail
 
 
-def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None):
+def _parse_config_only(text):
+    """Parse CONFIG_ONLY: true/false from the end of a BRD response."""
+    import re
+    m = re.search(r'CONFIG_ONLY:\s*(true|false)', text, re.IGNORECASE)
+    if m:
+        return m.group(1).lower() == "true"
+    return False
+
+
+def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None, issue_type=None):
     session = load_session(session_id) or {}
     requirement = requirement or session.get("requirement", "")
+    issue_type = issue_type or session.get("issue_type", "Feature")
 
     if not requirement:
         raise ValueError("requirement is required")
@@ -68,6 +78,37 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     file_tree = get_file_tree(repo_path)
     file_tree_str = "\n".join(file_tree)
 
+    if issue_type == "Bug":
+        # Bug flow: single-pass comprehensive analysis
+        file_contents = _load_relevant_files(requirement, repo_path, file_tree)
+        issue_title = requirement.split("\n")[0].strip()
+        brd = ask_claude(bug_analysis_prompt(issue_title, requirement, file_contents, file_tree_str))
+        system_analysis = ""
+        needs_clarification = False
+        config_only = False
+
+        save_session(session_id, {
+            "requirement": requirement,
+            "issue_title": issue_title,
+            "repo_path": repo_path,
+            "system_analysis": system_analysis,
+            "brd_draft": brd,
+            "needs_clarification": needs_clarification,
+            "issue_type": issue_type,
+            "config_only": config_only,
+            "stage": "ba",
+        })
+
+        return {
+            "system_analysis": system_analysis,
+            "brd": brd,
+            "needs_clarification": needs_clarification,
+            "config_only": config_only,
+            "issue_type": issue_type,
+            "next_stage": "dev",
+        }
+
+    # Feature / default flow
     # Step 1: Analyse the current system (always fresh, or load from session)
     system_analysis = session.get("system_analysis")
     if not system_analysis:
@@ -87,6 +128,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         brd = ask_claude(brd_prompt(requirement, system_analysis, file_tree_str))
 
     needs_clarification = _has_open_questions(brd)
+    config_only = _parse_config_only(brd)
 
     save_session(session_id, {
         "requirement": requirement,
@@ -95,6 +137,8 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "system_analysis": system_analysis,
         "brd_draft": brd,
         "needs_clarification": needs_clarification,
+        "issue_type": issue_type,
+        "config_only": config_only,
         "stage": "ba",
     })
 
@@ -102,5 +146,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "system_analysis": system_analysis,
         "brd": brd,
         "needs_clarification": needs_clarification,
-        "next_stage": "ba (answer questions)" if needs_clarification else "pm",
+        "config_only": config_only,
+        "issue_type": issue_type,
+        "next_stage": "ba (answer questions)" if needs_clarification else ("sa" if config_only else "sa"),
     }

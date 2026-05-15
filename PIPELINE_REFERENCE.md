@@ -1,26 +1,110 @@
 # SDLC Agent — Reference
 
-An AI-powered software development pipeline that runs entirely through GitHub issues and comments. Assign an issue to `support-accellier` and a chain of AI agents handles the full lifecycle — with human approval at every stage.
+An AI-powered software development pipeline that runs entirely through GitHub issues and comments. Assign an issue to `agent-accellier` and a chain of AI agents handles the full lifecycle — with human approval at every stage.
 
 ---
 
 ## Pipeline overview
 
+The pipeline has three distinct flows based on the GitHub issue type. Set the native `Type` field on the issue to `Bug` or `Feature`, or use a `[Prefix]` in the title for Task mode.
+
+---
+
+### Bug flow
+
 ```
-Issue assigned to support-accellier
-      ↓  milestone → BA Working
-BA Agent        — reads codebase, writes Business Requirements Document
-      ↓  comment: approve  →  milestone → SA Working
-SA Agent        — writes Solution Design Document (architecture, components, risks)
-      ↓  comment: approve  →  milestone → PM Working
-PM Agent        — breaks work into tasks, creates GitHub sub-issues per task
-      ↓  comment: approve  →  milestone → DEV Working
-Dev Agent       — writes code, runs tests (up to 3 retries), pushes branch, opens PR
+Issue assigned (type: Bug)
+      ↓  milestone → Bug Analysis Working
+BA Agent        — one-pass bug analysis: Clarification, Verification, Cause Determination,
+                  Cause Verification, Possible Solution
+      ↓  comment: approve  →  milestone → Dev Working
+Dev Agent       — writes fix, runs tests, opens PR
       ↓  comment: approve  →  milestone → Deploy / Complete
-Deploy Agent    — deploys to STAGE, runs smoke tests
-                  comment: approve → deploys to PROD
-                  auto-merges PR, deletes branch, creates GitHub Release
+Deploy Agent    — deploys to STAGE, then PROD
 ```
+
+| Milestone | When |
+|-----------|------|
+| Bug Analysis Working | BA agent running |
+| Bug Analysis Awaiting Approval | BA complete, waiting for approve |
+| Dev Working | Dev agent running |
+| Dev Awaiting Approval | Dev complete, waiting for approve |
+| Deploy / Complete | Deployed |
+
+---
+
+### Feature flow
+
+The BA agent detects whether the requirement needs code changes or only configuration, and includes `CONFIG_ONLY: true/false` in its output.
+
+**Code-change path (config_only: false):**
+
+```
+Issue assigned (type: Feature)
+      ↓  milestone → BRD Working
+BA Agent        — writes BRD, emits CONFIG_ONLY: false
+      ↓  comment: approve  →  milestone → TRD Working
+SA Agent        — writes Solution Design Document (TRD + Test Cases)
+      ↓  comment: approve  →  milestone → Planning Working
+PM Agent        — granular task breakdown, creates GitHub sub-issues
+      ↓  comment: approve  →  milestone → Dev Working
+Dev Agent       — writes code, runs tests, opens PR
+      ↓  comment: approve  →  milestone → Review Working
+Review Agent    — code review
+      ↓  comment: approve  →  milestone → Test Working
+QA Agent        — quality assurance
+      ↓  comment: approve  →  milestone → Deploy / Complete
+Deploy Agent    — stage then prod
+```
+
+**Config-only path (config_only: true):**
+
+```
+Issue assigned (type: Feature)
+      ↓  milestone → BRD Working
+BA Agent        — writes BRD, emits CONFIG_ONLY: true
+      ↓  comment: approve  →  milestone → TRD Working
+SA Agent        — writes config steps
+      ↓  comment: approve  →  milestone → Planning Working
+PM Agent        — posts config instructions, marks terminal → milestone: Config Complete → DONE
+```
+
+| Milestone | When |
+|-----------|------|
+| BRD Working | BA agent running |
+| BRD Awaiting Approval | BA complete |
+| TRD Working | SA agent running |
+| TRD Awaiting Approval | SA complete |
+| Planning Working | PM agent running |
+| Planning Awaiting Approval | PM complete (code-change path) |
+| Config Complete | PM complete (config-only path) |
+| Dev Working | Dev agent running |
+| Dev Awaiting Approval | Dev complete |
+| Review Working | Review agent running |
+| Review Awaiting Approval | Review complete |
+| Test Working | QA agent running |
+| Test Awaiting Approval | QA complete |
+| Deploy / Complete | Deployed |
+
+---
+
+### Task flow
+
+For targeted single-agent runs, prefix the issue title with `[AgentName]`. The issue type field is ignored — prefix detection takes priority.
+
+| Title prefix | Agents run |
+|--------------|-----------|
+| `[BA]` | BA only → done |
+| `[SA]` | SA only → done |
+| `[PM]` | PM only → done |
+| `[Dev]` | Dev → Review → QA → done (no Deploy) |
+| `[Review]` | Review → QA → done |
+| `[QA]` | QA only → done |
+| `[Deploy]` | Deploy only → done |
+
+Milestones: `Task: Assigned` on start, `Task: Complete` when done.
+
+---
 
 At every stage you can:
 - `approve` — advance to the next agent
@@ -30,11 +114,11 @@ At every stage you can:
 
 ## Trigger
 
-The pipeline starts **only** when an issue is assigned to `support-accellier`.
+The pipeline starts **only** when an issue is assigned to `agent-accellier`.
 
 - Issue opened without that assignee → nothing happens
-- Issue opened with `support-accellier` assigned → pipeline starts immediately
-- Existing issue later assigned to `support-accellier` → pipeline starts from BA
+- Issue opened with `agent-accellier` assigned → pipeline starts immediately
+- Existing issue later assigned to `agent-accellier` → pipeline starts from BA
 
 This lets you create draft issues without triggering the pipeline prematurely.
 
@@ -46,7 +130,7 @@ The pipeline automatically creates and updates GitHub milestones as it progresse
 
 | Milestone | When it's set |
 |-----------|--------------|
-| BA Working | Issue assigned to support-accellier, BA agent running |
+| BA Working | Issue assigned to agent-accellier, BA agent running |
 | BA Awaiting Approval | BA agent complete, waiting for `approve` |
 | SA Working | SA agent running |
 | SA Awaiting Approval | SA agent complete, waiting for `approve` |
@@ -203,7 +287,7 @@ curl -X POST http://localhost:5001/ba-agent \
 **Pipeline doesn't start when I assign the issue**
 - Check the webhook delivered: repo → Settings → Webhooks → Recent Deliveries
 - Check n8n workflow 1 is active (green toggle)
-- Confirm the assignee username is exactly `support-accellier`
+- Confirm the assignee username is exactly `agent-accellier`
 - Check API: `curl http://localhost:5001/repos`
 
 **BA agent returns 500**

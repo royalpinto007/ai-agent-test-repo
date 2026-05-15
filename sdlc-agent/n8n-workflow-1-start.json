@@ -47,41 +47,53 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://10.68.103.135:5001/set-milestone",
-        "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
+        "rules": {
+          "values": [
             {
-              "name": "owner",
-              "value": "={{ $json.body.repository.owner.login }}"
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.issue.type?.name }}",
+                    "rightValue": "Bug",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Bug"
             },
             {
-              "name": "repo",
-              "value": "={{ $json.body.repository.name }}"
-            },
-            {
-              "name": "issue_number",
-              "value": "={{ $json.body.issue.number }}"
-            },
-            {
-              "name": "milestone_title",
-              "value": "BA Awaiting Approval"
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.issue.type?.name }}",
+                    "rightValue": "Feature",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Feature"
             }
           ]
         },
         "options": {
-          "timeout": 10000
+          "fallbackOutput": "extra"
         }
       },
-      "id": "set-milestone-ba-awaiting",
-      "name": "Set Milestone BA Awaiting Approval",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "route-by-issue-type",
+      "name": "Route by Issue Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
       "position": [
-        580,
-        220
+        680,
+        300
       ]
     },
     {
@@ -106,7 +118,7 @@
             },
             {
               "name": "milestone_title",
-              "value": "BA Working"
+              "value": "Bug Analysis Working"
             }
           ]
         },
@@ -114,13 +126,13 @@
           "timeout": 10000
         }
       },
-      "id": "set-milestone-ba-working",
-      "name": "Set Milestone BA Working",
+      "id": "set-milestone-bug-working",
+      "name": "Set Milestone Bug Analysis Working",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        640,
-        220
+        900,
+        100
       ]
     },
     {
@@ -158,17 +170,21 @@
             {
               "name": "requirement",
               "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+            },
+            {
+              "name": "issue_type",
+              "value": "Bug"
             }
           ]
         }
       },
-      "id": "ba-agent",
-      "name": "BA Agent",
+      "id": "ba-agent-bug",
+      "name": "BA Agent (Bug)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        700,
-        220
+        1060,
+        100
       ]
     },
     {
@@ -178,15 +194,946 @@
         "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+        "body": "=## 🐛 BA Agent — Bug Analysis\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the analysis below, then comment `approve` to proceed to Dev.\n\n---\n\n{{ $json.brd }}"
       },
-      "id": "comment-brd",
+      "id": "comment-brd-bug",
+      "name": "Comment Bug Analysis",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Bug Analysis Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-bug-awaiting",
+      "name": "Set Milestone Bug Analysis Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BRD Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-brd-working",
+      "name": "Set Milestone BRD Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "options": {
+          "timeout": 300000
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "requirement",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+            },
+            {
+              "name": "issue_type",
+              "value": "Feature"
+            }
+          ]
+        }
+      },
+      "id": "ba-agent-feature",
+      "name": "BA Agent (Feature)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Config only:** {{ $json.config_only ? '✅ Yes — no code changes needed' : '❌ No — code changes required' }}\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+      },
+      "id": "comment-brd-feature",
       "name": "Comment BRD on Issue",
       "type": "n8n-nodes-base.github",
       "typeVersion": 1,
       "position": [
-        940,
-        220
+        1220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BRD Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-brd-awaiting",
+      "name": "Set Milestone BRD Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const title = $input.item.json.body.issue.title || '';\nconst m = title.match(/^\\[(BA|SA|PM|Dev|Review|QA|Deploy)\\]/);\nconst prefix = m ? m[1] : null;\nreturn [{ json: { ...$input.item.json, task_prefix: prefix } }];"
+      },
+      "id": "detect-task-prefix",
+      "name": "Detect Task Prefix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Assigned"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-assigned",
+      "name": "Set Milestone Task Assigned",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "BA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "BA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "SA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "SA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "PM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "PM"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Dev",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Dev"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Review"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "QA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "QA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Deploy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Deploy"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-task-prefix",
+      "name": "Switch Task Prefix",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1220,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"issue_type\": \"Task\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-ba-agent",
+      "name": "Task BA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/sa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-sa-agent",
+      "name": "Task SA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/pm-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-pm-agent",
+      "name": "Task PM Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/dev-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "task-dev-agent",
+      "name": "Task Dev Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-review-agent",
+      "name": "Task Review Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-qa-agent",
+      "name": "Task QA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/deploy-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"env\": \"stage\" }",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "task-deploy-agent",
+      "name": "Task Deploy Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        860
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-dev-review",
+      "name": "Task Dev → Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-dev-qa",
+      "name": "Task Dev → QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "task-review-qa",
+      "name": "Task Review → QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-ba",
+      "name": "Set Milestone Task Complete (BA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-sa",
+      "name": "Set Milestone Task Complete (SA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-pm",
+      "name": "Set Milestone Task Complete (PM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-dev",
+      "name": "Set Milestone Task Complete (Dev)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-review",
+      "name": "Set Milestone Task Complete (Review)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-qa",
+      "name": "Set Milestone Task Complete (QA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-milestone-task-complete-deploy",
+      "name": "Set Milestone Task Complete (Deploy)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1620,
+        860
       ]
     }
   ],
@@ -206,7 +1153,7 @@
       "main": [
         [
           {
-            "node": "Set Milestone BA Awaiting Approval",
+            "node": "Route by Issue Type",
             "type": "main",
             "index": 0
           }
@@ -214,33 +1161,276 @@
         []
       ]
     },
-    "Set Milestone BA Awaiting Approval": {
+    "Route by Issue Type": {
       "main": [
         [
           {
-            "node": "Set Milestone BA Working",
+            "node": "Set Milestone Bug Analysis Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone BRD Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detect Task Prefix",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Set Milestone BA Working": {
+    "Set Milestone Bug Analysis Working": {
       "main": [
         [
           {
-            "node": "BA Agent",
+            "node": "BA Agent (Bug)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BA Agent": {
+    "BA Agent (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Comment Bug Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Bug Analysis": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Bug Analysis Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone BRD Working": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (Feature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BA Agent (Feature)": {
       "main": [
         [
           {
             "node": "Comment BRD on Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment BRD on Issue": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone BRD Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Task Prefix": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Task Assigned": {
+      "main": [
+        [
+          {
+            "node": "Switch Task Prefix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Task Prefix": {
+      "main": [
+        [
+          {
+            "node": "Task BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Deploy Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task BA Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (BA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task SA Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (SA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task PM Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (PM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Task Dev → Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev → Review": {
+      "main": [
+        [
+          {
+            "node": "Task Dev → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev → QA": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (Dev)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Task Review → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Review → QA": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (Review)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (QA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Deploy Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Complete (Deploy)",
             "type": "main",
             "index": 0
           }

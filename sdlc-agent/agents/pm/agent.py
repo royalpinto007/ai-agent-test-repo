@@ -247,6 +247,8 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
                 "main_branch": code_cfg.get("main_branch", "main"),
             }
 
+    config_only = session.get("config_only", False)
+
     save_session(session_id, {
         "pm_output": pm_output,
         "pm_has_blocking_questions": has_blocking,
@@ -258,6 +260,31 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "stage": "pm",
     })
 
+    # Config-only feature: PM posts config instructions and terminates the pipeline
+    if config_only:
+        token = os.environ.get("GITHUB_TOKEN", "")
+        owner = session.get("owner", "")
+        repo_name = session.get("repo", "")
+        issue_number = session.get("issue_number")
+        if owner and repo_name and issue_number and token:
+            from shared.utils import post_github_comment
+            post_github_comment(
+                owner, repo_name, issue_number,
+                "## Config Instructions Complete\n\nThis requirement can be satisfied through configuration only — no code changes required.\n\n" + pm_output,
+                token
+            )
+        return {
+            "pm_output": pm_output,
+            "has_blocking_questions": False,
+            "dev_ready": False,
+            "created_issues": created_issues,
+            "issues_error": issues_error,
+            "cross_repo_issues": cross_repo_issues,
+            "target_repo": target_repo,
+            "terminal": True,
+            "next_stage": "complete",
+        }
+
     return {
         "pm_output": pm_output,
         "has_blocking_questions": has_blocking,
@@ -266,5 +293,6 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "issues_error": issues_error,
         "cross_repo_issues": cross_repo_issues,
         "target_repo": target_repo,
+        "terminal": False,
         "next_stage": "pm (answer questions)" if has_blocking else "dev",
     }

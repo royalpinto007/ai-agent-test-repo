@@ -1,19 +1,65 @@
 # How to Write Issues for the SDLC Agent
 
-The pipeline starts when you assign `support-accellier` to an issue on `Thrive-ERP/thrive-requirements`. Everything — the BRD, the architecture, the task breakdown, the code — flows from what you write. A vague issue produces vague output. A clear issue produces a PR you can merge.
+The pipeline starts when you assign `agent-accellier` to an issue on `Thrive-ERP/thrive-requirements`. Everything — the BRD, the architecture, the task breakdown, the code — flows from what you write. A vague issue produces vague output. A clear issue produces a PR you can merge.
+
+---
+
+## Issue types
+
+The pipeline runs different flows depending on the **GitHub issue type** (the native `Type` field on the issue). Set it before assigning `agent-accellier`.
+
+| Issue type | When to use | Flow |
+|------------|-------------|------|
+| **Bug** | Something is broken and needs a root-cause fix | BA (analysis only) → Dev → Deploy |
+| **Feature** | New functionality or enhancement | BA → SA → PM → Dev → Review → QA → Deploy (or config-only shortcut) |
+| **Task** (via title prefix) | Direct single-agent invocation | Detected from `[Prefix]` in the title — see Task section below |
+
+### When to use Bug vs Feature
+
+- **Bug**: you know something is broken and want a root-cause analysis + fix. The BA agent produces a structured bug report (Clarification, Verification, Cause Determination, Cause Verification, Possible Solution) in one pass. No architecture phase — goes straight to Dev.
+- **Feature**: anything additive. New screens, new APIs, new integrations, refactors that change behaviour. Goes through the full BA → SA → PM planning cycle before any code is written.
+
+### Config-only detection (Feature type)
+
+When the issue type is Feature, the BA agent automatically detects whether the requirement can be satisfied through configuration alone (no code changes). If so, it sets `CONFIG_ONLY: true` in its output and the pipeline skips Dev/Review/QA, routing to PM which posts config instructions and terminates.
+
+The BA comment on the issue will indicate: **Config only: ✅ Yes** or **❌ No**.
+
+### Task prefix usage
+
+For targeted single-agent runs, prefix the issue title with `[AgentName]`. The issue type field is ignored when a prefix is detected.
+
+| Title prefix | Agents run |
+|--------------|-----------|
+| `[BA]` | BA analysis only |
+| `[SA]` | SA design only |
+| `[PM]` | PM planning only |
+| `[Dev]` | Dev → Review → QA (no Deploy) |
+| `[Review]` | Review → QA |
+| `[QA]` | QA only |
+| `[Deploy]` | Deploy only |
+
+**Examples:**
+```
+[Dev] Fix checkout calculation rounding error
+[QA] Regression test for order confirmation flow
+[SA] Design caching layer for product catalogue API
+```
+
+Tasks use milestone `Task: Assigned` → `Task: Complete`. No approval gates are required — all agents in the chain run automatically.
 
 ---
 
 ## Trigger
 
-The pipeline does **not** start when an issue is created. It starts when `support-accellier` is **assigned** to the issue.
+The pipeline does **not** start when an issue is created. It starts when `agent-accellier` is **assigned** to the issue.
 
 This means you can:
 - Draft issues without triggering the pipeline
 - Review and edit the description before assigning
 - Assign later when you're ready for the agents to start
 
-Once `support-accellier` is assigned, the BA agent starts immediately and the first milestone (`BA Working`) is set.
+Once `agent-accellier` is assigned, the BA agent starts immediately and the first milestone (`BA Working`) is set.
 
 ---
 

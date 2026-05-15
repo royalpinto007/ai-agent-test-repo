@@ -105,19 +105,23 @@ def ba_agent():
     session = load_session(sid) or {}
     repo_path, test_command, main_branch = _repo_config(data, session)
     try:
+        issue_type = data.get("issue_type") or session.get("issue_type", "Feature")
         result = ba.run(
             session_id=sid,
             requirement=data.get("requirement") or session.get("requirement", ""),
             repo_path=repo_path,
             clarification_answers=data.get("clarification_answers"),
             human_feedback=data.get("human_feedback"),
+            issue_type=issue_type,
         )
         # Persist repo metadata so downstream agents can find it
         save_session(sid, {
             "owner": data.get("owner") or session.get("owner", ""),
             "repo": data.get("repo") or session.get("repo", ""),
+            "issue_number": data.get("issue_number") or session.get("issue_number"),
             "test_command": test_command,
             "main_branch": main_branch,
+            "issue_type": issue_type,
         })
         # Post BRD as a GitHub comment if we have owner/repo/issue_number
         owner = data.get("owner") or session.get("owner", "")
