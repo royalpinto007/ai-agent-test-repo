@@ -212,7 +212,7 @@ SA Working → SA Awaiting Approval
                 ↓ approve
 PM Working → PM Awaiting Approval
                 ↓ approve
-DEV Working → DEV Awaiting Approval
+DEV Working → Review Working → Test Working → Test Awaiting Approval
                 ↓ approve
 Deploy / Complete
 ```

@@ -135,8 +135,10 @@ Create these milestones on `Thrive-ERP/thrive-requirements` at `https://github.c
 - `SA Working`
 - `PM Awaiting Approval`
 - `PM Working`
-- `DEV Awaiting Approval`
 - `DEV Working`
+- `Review Working`
+- `Test Working`
+- `Test Awaiting Approval`
 - `Deploy / Complete`
 
 The API creates them automatically if missing, but creating upfront avoids the first-run delay.
