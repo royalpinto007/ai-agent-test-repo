@@ -11,7 +11,7 @@ The pipeline runs different flows depending on the **GitHub issue type** (the na
 | Issue type | When to use | Flow |
 |------------|-------------|------|
 | **Bug** | Something is broken and needs a root-cause fix | BA (analysis only) → Dev → Deploy |
-| **Feature** | New functionality or enhancement | BA → SA → PM → Dev → Review → QA → Deploy (or config-only shortcut) |
+| **Feature** | New functionality or enhancement | BA → SA → PM → (Dev + Review + QA, auto-chained) → Deploy (or config-only shortcut) |
 | **Task** (via title prefix) | Direct single-agent invocation | Detected from `[Prefix]` in the title — see Task section below |
 
 ### When to use Bug vs Feature
@@ -21,7 +21,7 @@ The pipeline runs different flows depending on the **GitHub issue type** (the na
 
 ### Config-only detection (Feature type)
 
-When the issue type is Feature, the BA agent automatically detects whether the requirement can be satisfied through configuration alone (no code changes). If so, it sets `CONFIG_ONLY: true` in its output and the pipeline skips Dev/Review/QA, routing to PM which posts config instructions and terminates.
+When the issue type is Feature, the BA agent automatically detects whether the requirement can be satisfied through configuration alone (no code changes). If so, it sets `CONFIG_ONLY: true` in its output and the pipeline skips the Dev/Review/QA chain, routing to PM which posts config instructions and terminates.
 
 The BA comment on the issue will indicate: **Config only: ✅ Yes** or **❌ No**.
 
