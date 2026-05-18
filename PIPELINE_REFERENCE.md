@@ -49,15 +49,14 @@ SA Agent        — writes Solution Design Document (TRD + Test Cases)
 PM Agent        — granular task breakdown, creates GitHub sub-issues
       ↓  comment: approve  →  milestone → Dev Working
 Dev Agent       — writes code, runs tests, opens PR
-      ↓  auto                →  milestone → Review Working
-Review Agent    — code review
-      ↓  auto                →  milestone → Test Working
-QA Agent        — quality assurance
+Review Agent    — code review (auto)
+QA Agent        — quality assurance (auto)
+      ↓                     →  milestone → Dev Awaiting Approval
       ↓  comment: approve  →  milestone → Deploy / Complete
 Deploy Agent    — stage then prod
 ```
 
-After PM is approved, Dev → Review → QA runs as a single chain. The pipeline only stops again at **Test Awaiting Approval** for the final human gate before Deploy.
+After PM is approved, Dev → Review → QA runs as a single chain under the **Dev Working** milestone. When all three finish, the milestone switches to **Dev Awaiting Approval** — the final human gate before Deploy.
 
 **Config-only path (config_only: true):**
 
@@ -80,10 +79,8 @@ PM Agent        — posts config instructions, marks terminal → milestone: Con
 | Planning Working | PM agent running |
 | Planning Awaiting Approval | PM complete (code-change path) |
 | Config Complete | PM complete (config-only path) |
-| Dev Working | Dev agent running |
-| Review Working | Review agent running (auto after Dev) |
-| Test Working | QA agent running (auto after Review) |
-| Test Awaiting Approval | QA complete — final human gate before Deploy |
+| Dev Working | Dev → Review → QA chain running |
+| Dev Awaiting Approval | Chain complete — final human gate before Deploy |
 | Deploy / Complete | Deployed |
 
 ---
@@ -136,10 +133,8 @@ The pipeline automatically creates and updates GitHub milestones as it progresse
 | SA Awaiting Approval | SA agent complete, waiting for `approve` |
 | PM Working | PM agent running |
 | PM Awaiting Approval | PM agent complete, waiting for `approve` |
-| DEV Working | Dev agent running |
-| Review Working | Review agent running (auto after Dev) |
-| Test Working | QA agent running (auto after Review) |
-| Test Awaiting Approval | Dev/Review/QA chain complete, waiting for `approve` |
+| DEV Working | Dev → Review → QA chain running |
+| DEV Awaiting Approval | Chain complete, waiting for `approve` |
 | Deploy / Complete | Deploy complete |
 
 Only one milestone is active at a time. The old one is replaced when the pipeline advances.
