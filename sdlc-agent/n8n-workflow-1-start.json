@@ -151,7 +151,7 @@
         "sendBody": true,
         "specifyBody": "keypair",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         },
         "bodyParameters": {
           "parameters": [
@@ -299,7 +299,7 @@
         "sendBody": true,
         "specifyBody": "keypair",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         },
         "bodyParameters": {
           "parameters": [
@@ -590,7 +590,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"issue_type\": \"Task\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-ba-agent",
@@ -619,7 +619,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-sa-agent",
@@ -648,7 +648,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-pm-agent",
@@ -677,7 +677,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 600000
+          "timeout": 21600000
         }
       },
       "id": "task-dev-agent",
@@ -706,7 +706,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-review-agent",
@@ -735,7 +735,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-qa-agent",
@@ -764,7 +764,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"env\": \"stage\" }",
         "options": {
-          "timeout": 1800000
+          "timeout": 21600000
         }
       },
       "id": "task-deploy-agent",
@@ -793,7 +793,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-dev-review",
@@ -822,7 +822,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-dev-qa",
@@ -851,7 +851,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "task-review-qa",

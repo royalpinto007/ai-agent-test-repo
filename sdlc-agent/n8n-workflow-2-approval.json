@@ -591,7 +591,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "sa-agent",
@@ -716,7 +716,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "pm-agent",
@@ -841,7 +841,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\"\n}",
         "options": {
-          "timeout": 600000
+          "timeout": 21600000
         }
       },
       "id": "dev-agent",
@@ -927,7 +927,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "ba-revise",
@@ -956,7 +956,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "sa-revise",
@@ -985,7 +985,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"human_feedback\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^revise:/i, '').trim()) }}\n}",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "pm-revise",
@@ -1014,7 +1014,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"redo_instructions\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^redo-dev:/i, '').trim()) }}\n}",
         "options": {
-          "timeout": 600000
+          "timeout": 21600000
         }
       },
       "id": "dev-redo",
@@ -1043,7 +1043,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\",\n  \"reason\": {{ JSON.stringify($('GitHub Comment Webhook').item.json.body.comment.body.replace(/^reopen:?/i, '').trim()) }}\n}",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "reopen-agent",
@@ -1395,7 +1395,7 @@
           ]
         },
         "options": {
-          "timeout": 1800000
+          "timeout": 21600000
         }
       },
       "onError": "continueRegularOutput"
@@ -1452,7 +1452,7 @@
           ]
         },
         "options": {
-          "timeout": 1800000
+          "timeout": 21600000
         }
       },
       "onError": "continueRegularOutput"
@@ -1531,7 +1531,7 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\"\n}",
         "options": {
-          "timeout": 600000
+          "timeout": 21600000
         }
       },
       "id": "bug-dev-agent",
@@ -1656,7 +1656,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "review-agent",
@@ -1781,7 +1781,7 @@
         "specifyBody": "json",
         "jsonBody": "={ \"session_id\": \"{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}\" }",
         "options": {
-          "timeout": 300000
+          "timeout": 21600000
         }
       },
       "id": "qa-agent",
