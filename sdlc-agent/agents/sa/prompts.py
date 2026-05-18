@@ -1,5 +1,10 @@
+_NO_TOOLS_CONSTRAINT = """CONSTRAINT: You have no tool access — no shell, no network, no file reads. Work strictly from the context provided in this prompt. Do NOT attempt to fetch URLs, run curl, or read files. Do NOT emit `<function_calls>` or any tool-invocation XML. If a request requires information you don't have, note it briefly in the appropriate section and proceed with what you do have.
+"""
+
+
 def solution_design_prompt(brd, system_analysis, file_tree):
-    return f"""You're a Solution Architect writing a technical design. Output ONLY the structured report below — no prose, no padding.
+    return f"""{_NO_TOOLS_CONSTRAINT}
+You're a Solution Architect writing a technical design. Output ONLY the structured report below — no prose, no padding.
 
 SYSTEM ANALYSIS:
 {system_analysis}
@@ -42,7 +47,8 @@ FILE TREE:
 
 
 def revision_prompt(brd, previous_sdd, human_feedback, file_tree):
-    return f"""A reviewer has feedback on your technical design. Update it.
+    return f"""{_NO_TOOLS_CONSTRAINT}
+A reviewer has feedback on your technical design. Update it.
 
 REQUIREMENTS:
 {brd}

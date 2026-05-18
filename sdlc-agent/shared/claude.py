@@ -9,6 +9,16 @@ log = logging.getLogger(__name__)
 RESET_BUFFER_SECONDS = 30
 MAX_RETRIES = 1
 
+_TOOL_CALL_BLOCK = re.compile(
+    r"<function_calls>.*?</function_calls>\s*",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_tool_calls(text: str) -> str:
+    """Remove any leaked tool-call XML from agent output."""
+    return _TOOL_CALL_BLOCK.sub("", text).strip()
+
 
 def _parse_reset_seconds(stderr: str) -> int | None:
     """Return seconds to wait until Claude's rate limit resets, or None if not a limit error."""
@@ -56,7 +66,7 @@ def ask_claude(prompt):
                 if lines and lines[-1].strip() == "```":
                     lines = lines[:-1]
                 output = "\n".join(lines)
-            return output
+            return _strip_tool_calls(output)
 
         stderr = result.stderr.strip()
         wait_seconds = _parse_reset_seconds(stderr + " " + result.stdout)
