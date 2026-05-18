@@ -342,7 +342,7 @@
         "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Config only:** {{ $json.config_only ? '✅ Yes — no code changes needed' : '❌ No — code changes required' }}\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Resolution tier:** {{ $json.resolution_tier === 'config' ? '⚙️ Config — no code change needed' : ($json.resolution_tier === 'workaround' ? '🔧 Workaround — use existing features differently' : '💻 Code change required') }}\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
       },
       "id": "comment-brd-feature",
       "name": "Comment BRD on Issue",

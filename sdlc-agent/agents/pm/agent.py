@@ -248,6 +248,7 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
             }
 
     config_only = session.get("config_only", False)
+    resolution_tier = session.get("resolution_tier", "code_change")
 
     save_session(session_id, {
         "pm_output": pm_output,
@@ -260,7 +261,8 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         "stage": "pm",
     })
 
-    # Config-only feature: PM posts config instructions and terminates the pipeline
+    # Non-code resolution path: PM posts the appropriate instructions and terminates the pipeline.
+    # Covers both `config` (settings change) and `workaround` (use existing features differently).
     if config_only:
         token = os.environ.get("GITHUB_TOKEN", "")
         owner = session.get("owner", "")
@@ -268,9 +270,15 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         issue_number = session.get("issue_number")
         if owner and repo_name and issue_number and token:
             from shared.utils import post_github_comment
+            if resolution_tier == "workaround":
+                heading = "## Workaround — No Code Change Needed"
+                intro = "This requirement can be satisfied with existing functionality. Follow the workaround steps in the BRD."
+            else:
+                heading = "## Config Instructions — No Code Change Needed"
+                intro = "This requirement can be satisfied through configuration only."
             post_github_comment(
                 owner, repo_name, issue_number,
-                "## Config Instructions Complete\n\nThis requirement can be satisfied through configuration only — no code changes required.\n\n" + pm_output,
+                f"{heading}\n\n{intro}\n\n{pm_output}",
                 token
             )
         return {
@@ -281,6 +289,7 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
             "issues_error": issues_error,
             "cross_repo_issues": cross_repo_issues,
             "target_repo": target_repo,
+            "resolution_tier": resolution_tier,
             "terminal": True,
             "next_stage": "complete",
         }

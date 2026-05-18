@@ -35,14 +35,20 @@ Deploy Agent    — deploys to STAGE, then PROD
 
 ### Feature flow
 
-The BA agent detects whether the requirement needs code changes or only configuration, and includes `CONFIG_ONLY: true/false` in its output.
+The BA agent picks the **cheapest resolution tier** that satisfies the requirement. The chosen tier is emitted at the end of the BRD as `RESOLUTION_TIER: config | workaround | code_change`.
 
-**Code-change path (config_only: false):**
+| Tier | Meaning | Pipeline outcome |
+|------|---------|------------------|
+| **Config** | Existing functionality can be configured to meet the requirement | SA + PM run, then PM posts config steps and **terminates** — no Dev |
+| **Workaround** | Existing functionality already supports it — user just needs to use it differently | SA + PM run, then PM posts workaround steps and **terminates** — no Dev |
+| **Code change** | Neither config nor workaround can satisfy it | Full Dev → Review → QA → Deploy chain |
+
+**Code-change path:**
 
 ```
 Issue assigned (type: Feature)
       ↓  milestone → BRD Working
-BA Agent        — writes BRD, emits CONFIG_ONLY: false
+BA Agent        — writes BRD, emits RESOLUTION_TIER: code_change
       ↓  comment: approve  →  milestone → TRD Working
 SA Agent        — writes Solution Design Document (TRD + Test Cases)
       ↓  comment: approve  →  milestone → Planning Working
@@ -58,16 +64,16 @@ Deploy Agent    — stage then prod
 
 After PM is approved, Dev → Review → QA runs as a single chain under the **Dev Working** milestone. When all three finish, the milestone switches to **Dev Awaiting Approval** — the final human gate before Deploy.
 
-**Config-only path (config_only: true):**
+**Config / Workaround paths (no code change):**
 
 ```
 Issue assigned (type: Feature)
       ↓  milestone → BRD Working
-BA Agent        — writes BRD, emits CONFIG_ONLY: true
+BA Agent        — writes BRD, emits RESOLUTION_TIER: config OR workaround
       ↓  comment: approve  →  milestone → TRD Working
-SA Agent        — writes config steps
+SA Agent        — writes the config or workaround steps in detail
       ↓  comment: approve  →  milestone → Planning Working
-PM Agent        — posts config instructions, marks terminal → milestone: Config Complete → DONE
+PM Agent        — posts the instructions, marks terminal → DONE
 ```
 
 | Milestone | When |

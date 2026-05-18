@@ -52,13 +52,17 @@ def _has_open_questions(brd):
     return "none" not in tail and "fully specified" not in tail
 
 
-def _parse_config_only(text):
-    """Parse CONFIG_ONLY: true/false from the end of a BRD response."""
+def _parse_resolution_tier(text):
+    """Parse RESOLUTION_TIER: config|workaround|code_change from the end of a BRD response."""
     import re
+    m = re.search(r'RESOLUTION_TIER:\s*(config|workaround|code_change)', text, re.IGNORECASE)
+    if m:
+        return m.group(1).lower()
+    # Backward-compat: older BRDs used CONFIG_ONLY: true/false
     m = re.search(r'CONFIG_ONLY:\s*(true|false)', text, re.IGNORECASE)
     if m:
-        return m.group(1).lower() == "true"
-    return False
+        return "config" if m.group(1).lower() == "true" else "code_change"
+    return "code_change"
 
 
 def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None, issue_type=None):
@@ -95,6 +99,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
             "brd_draft": brd,
             "needs_clarification": needs_clarification,
             "issue_type": issue_type,
+            "resolution_tier": "code_change",
             "config_only": config_only,
             "stage": "ba",
         })
@@ -103,6 +108,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
             "system_analysis": system_analysis,
             "brd": brd,
             "needs_clarification": needs_clarification,
+            "resolution_tier": "code_change",
             "config_only": config_only,
             "issue_type": issue_type,
             "next_stage": "dev",
@@ -128,7 +134,8 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         brd = ask_claude(brd_prompt(requirement, system_analysis, file_tree_str))
 
     needs_clarification = _has_open_questions(brd)
-    config_only = _parse_config_only(brd)
+    resolution_tier = _parse_resolution_tier(brd)
+    config_only = resolution_tier in ("config", "workaround")
 
     save_session(session_id, {
         "requirement": requirement,
@@ -138,6 +145,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "brd_draft": brd,
         "needs_clarification": needs_clarification,
         "issue_type": issue_type,
+        "resolution_tier": resolution_tier,
         "config_only": config_only,
         "stage": "ba",
     })
@@ -146,7 +154,8 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "system_analysis": system_analysis,
         "brd": brd,
         "needs_clarification": needs_clarification,
+        "resolution_tier": resolution_tier,
         "config_only": config_only,
         "issue_type": issue_type,
-        "next_stage": "ba (answer questions)" if needs_clarification else ("sa" if config_only else "sa"),
+        "next_stage": "ba (answer questions)" if needs_clarification else "sa",
     }

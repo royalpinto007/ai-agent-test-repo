@@ -19,11 +19,17 @@ The pipeline runs different flows depending on the **GitHub issue type** (the na
 - **Bug**: you know something is broken and want a root-cause analysis + fix. The BA agent produces a structured bug report (Clarification, Verification, Cause Determination, Cause Verification, Possible Solution) in one pass. No architecture phase — goes straight to Dev.
 - **Feature**: anything additive. New screens, new APIs, new integrations, refactors that change behaviour. Goes through the full BA → SA → PM planning cycle before any code is written.
 
-### Config-only detection (Feature type)
+### Resolution tier (Feature type)
 
-When the issue type is Feature, the BA agent automatically detects whether the requirement can be satisfied through configuration alone (no code changes). If so, it sets `CONFIG_ONLY: true` in its output and the pipeline skips the Dev/Review/QA chain, routing to PM which posts config instructions and terminates.
+When the issue type is Feature, the BA agent picks the **cheapest tier** that solves the requirement and emits `RESOLUTION_TIER: <tier>` at the end of the BRD:
 
-The BA comment on the issue will indicate: **Config only: ✅ Yes** or **❌ No**.
+| Tier | Meaning | Outcome |
+|------|---------|---------|
+| **Config** | Solved by changing a configuration setting | SA + PM produce instructions, then pipeline terminates — no Dev |
+| **Workaround** | Existing functionality already covers it — user just needs to use it differently | Same as Config — terminates after PM with step-by-step instructions |
+| **Code change** | Neither config nor workaround can satisfy it | Full Dev → Review → QA → Deploy chain |
+
+The BA comment on the issue shows the chosen tier clearly (⚙️ Config / 🔧 Workaround / 💻 Code change). If you disagree with the tier (e.g., BA picked code change but you know a config-only path exists), use `revise:` with that feedback.
 
 ### Task prefix usage
 

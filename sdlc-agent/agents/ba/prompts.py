@@ -102,18 +102,33 @@ FILE TREE:
 - [item]
 (max 4 bullets — omit section if none)
 
-## Config Only?
-Yes / No — [one line reason]
+## Resolution Approach
+Pick the cheapest tier that actually solves the requirement.
+
+| Tier | When to choose |
+|------|---------------|
+| **Config** | Existing functionality can be configured to meet the requirement. No code changes, no behavioural changes for other users. |
+| **Workaround** | Existing functionality already supports this — the user just needs to use it differently. No config change, no code change. |
+| **Code change** | Neither config nor workaround can satisfy the requirement. New code is required. |
+
+Chosen tier: Config / Workaround / Code change — [one line reason]
+
+## Workaround (if applicable)
+[omit this section entirely if tier is not "Workaround"]
+[3-5 concrete steps using existing functionality — be specific about screens, fields, settings]
 
 ## Open Questions
 - [question] — Blocking: Yes/No
 (max 3 questions — omit section if none)
 
 Finally, on the very last line of your response, write exactly one of:
-CONFIG_ONLY: true
-CONFIG_ONLY: false
+RESOLUTION_TIER: config
+RESOLUTION_TIER: workaround
+RESOLUTION_TIER: code_change
 
-Write `CONFIG_ONLY: true` only if the requirement can be satisfied entirely through configuration with no code changes needed. Otherwise write `CONFIG_ONLY: false`.
+- `config` — satisfied by configuration only
+- `workaround` — satisfied by using existing functionality differently
+- `code_change` — requires development work
 """
 
 
