@@ -114,7 +114,9 @@ def ba_agent():
             human_feedback=data.get("human_feedback"),
             issue_type=issue_type,
         )
-        # Persist repo metadata so downstream agents can find it
+        # Persist repo metadata so downstream agents can find it.
+        # GitHub comment posting is handled by n8n (workflow 1's "Comment BRD on Issue" node),
+        # not here — posting from both layers caused duplicate BRD comments on every run.
         save_session(sid, {
             "owner": data.get("owner") or session.get("owner", ""),
             "repo": data.get("repo") or session.get("repo", ""),
@@ -123,23 +125,6 @@ def ba_agent():
             "main_branch": main_branch,
             "issue_type": issue_type,
         })
-        # Post BRD as a GitHub comment if we have owner/repo/issue_number
-        owner = data.get("owner") or session.get("owner", "")
-        repo = data.get("repo") or session.get("repo", "")
-        issue_number = data.get("issue_number") or session.get("issue_number")
-        token = os.environ.get("GITHUB_TOKEN", "")
-        if owner and repo and issue_number and token:
-            from shared.utils import post_github_comment
-            brd = result.get("brd", "")
-            needs_clarification = result.get("needs_clarification", False)
-            comment = (
-                f"## 🤖 BA Agent — Business Requirements Document\n\n"
-                f"**Session:** `{sid}`\n"
-                f"**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n"
-                f"---\n\n{brd}\n\n---\n\n"
-                f"*Needs clarification: {needs_clarification}*"
-            )
-            post_github_comment(owner, repo, issue_number, comment, token)
         return jsonify({"status": "success", "stage": "ba", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
