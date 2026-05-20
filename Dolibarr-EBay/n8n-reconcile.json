@@ -1,0 +1,233 @@
+{
+  "name": "eBay Payout to Dolibarr Reconciliation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ebay-reconcile",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0001-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1600, 0],
+      "webhookId": "ebay-reconcile"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Parse the eBay payout CSV. The webhook receives JSON {filename, data} where\n// data is the base64-encoded CSV. (This avoids n8n's binary-property handling.)\nconst body = items[0].json.body || items[0].json;\nif (!body.data) {\n  throw new Error('Expected JSON body with a base64 `data` field. Got keys: ' + Object.keys(body).join(', '));\n}\nconst text = Buffer.from(body.data, 'base64').toString('utf8');\nconst lines = text.split(/\\r?\\n/);\nconst headerIdx = lines.findIndex(l => l.startsWith('\"Transaction creation date\"'));\nif (headerIdx === -1) throw new Error('Header row not found - upload an eBay payout CSV');\n\nfunction parseRow(line) {\n  const out = [];\n  let cur = '', inQ = false;\n  for (let i = 0; i < line.length; i++) {\n    const c = line[i];\n    if (c === '\"') { inQ = !inQ; continue; }\n    if (c === ',' && !inQ) { out.push(cur); cur = ''; continue; }\n    cur += c;\n  }\n  out.push(cur);\n  return out;\n}\n\nconst header = parseRow(lines[headerIdx]);\nconst orderCol = header.indexOf('Order number');\nconst netCol = header.indexOf('Net amount');\nconst typeCol = header.indexOf('Type');\nif (orderCol < 0 || netCol < 0) throw new Error('Required columns not found');\n\nconst groups = new Map();\nfor (let i = headerIdx + 1; i < lines.length; i++) {\n  const row = parseRow(lines[i]);\n  const order = (row[orderCol] || '').trim();\n  const netRaw = (row[netCol] || '').replace(/,/g, '').trim();\n  if (!order || order === '--') continue;\n  if (!netRaw || netRaw === '--') continue;\n  const net = Number(netRaw);\n  if (!Number.isFinite(net)) continue;\n  const g = groups.get(order) || { orderNumber: order, ebayNet: 0, rows: 0, types: new Set() };\n  g.ebayNet += net;\n  g.rows += 1;\n  g.types.add((row[typeCol] || '').trim());\n  groups.set(order, g);\n}\n\nreturn Array.from(groups.values()).map(g => ({\n  json: { orderNumber: g.orderNumber, ebayNet: Math.round(g.ebayNet * 100) / 100, rows: g.rows, types: Array.from(g.types) }\n}));"
+      },
+      "id": "0002-parse",
+      "name": "Parse and Group",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1400, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://staging.txscorp.com/api/index.php/orders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "limit", "value": "1" },
+            { "name": "sqlfilters", "value": "=(t.ref_client:=:'{{$json.orderNumber.replace(/'/g, \"''\")}}')" }
+          ]
+        },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "0003-find-order",
+      "name": "Find SO by ref_client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1200, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Map each Find SO response (one Dolibarr order each, auto-unwrapped from\n// Dolibarr's [] response) back to its eBay context via ref_client. Also emit\n// MISSING entries for eBay orders Dolibarr didn't return.\nconst ebayMap = new Map();\nfor (const e of $('Parse and Group').all()) {\n  ebayMap.set(e.json.orderNumber, e.json);\n}\n\nconst seen = new Set();\nconst out = [];\n\nfor (const it of items) {\n  const so = it.json;\n  if (!so || !so.id || !so.ref_client) continue;\n  const ebay = ebayMap.get(so.ref_client);\n  if (!ebay) continue;\n  seen.add(so.ref_client);\n  out.push({ json: {\n    orderNumber: ebay.orderNumber,\n    ebayNet:     ebay.ebayNet,\n    ebayRows:    ebay.rows,\n    ebayTypes:   ebay.types,\n    dolOrderId:  so.id,\n    dolOrderRef: so.ref,\n    status:      'pending',\n  }});\n}\n\nfor (const [orderNumber, ebay] of ebayMap) {\n  if (seen.has(orderNumber)) continue;\n  out.push({ json: {\n    orderNumber: ebay.orderNumber,\n    ebayNet:     ebay.ebayNet,\n    ebayRows:    ebay.rows,\n    ebayTypes:   ebay.types,\n    dolOrderId:  null,\n    dolOrderRef: null,\n    dolNet:      0,\n    diff:        ebay.ebayNet,\n    invoices:    [],\n    status:      'MISSING_IN_DOLIBARR',\n  }});\n}\n\nreturn out;"
+      },
+      "id": "0004-classify",
+      "name": "Classify (found/missing)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1000, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "f1", "leftValue": "={{$json.status}}", "rightValue": "pending", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "0005-if-found",
+      "name": "IF order found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-800, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://staging.txscorp.com/api/index.php/orders/{{$json.dolOrderId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        }
+      },
+      "id": "0006-get-order-detail",
+      "name": "GET order detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-600, -160]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Each input item is a full Dolibarr order detail (linkedObjectsIds populated).\n// Look up the eBay context by ref_client (NOT by index - HTTP nodes can drop items).\nconst classifyMap = new Map();\nfor (const c of $('Classify (found/missing)').all()) {\n  if (c.json.status === 'pending') classifyMap.set(c.json.orderNumber, c.json);\n}\n\nconst out = [];\nfor (const it of items) {\n  const order = it.json;\n  const ctx = classifyMap.get(order.ref_client);\n  if (!ctx) continue;\n  const linked = ((order.linkedObjectsIds || {}).facture) || {};\n  const invoiceIds = Object.values(linked);\n  const base = {\n    orderNumber: ctx.orderNumber,\n    ebayNet:     ctx.ebayNet,\n    ebayRows:    ctx.ebayRows,\n    ebayTypes:   ctx.ebayTypes,\n    dolOrderId:  ctx.dolOrderId,\n    dolOrderRef: ctx.dolOrderRef,\n  };\n  if (invoiceIds.length === 0) {\n    out.push({ json: { ...base, hasInvoice: false, invoiceId: null } });\n  } else {\n    for (const invId of invoiceIds) {\n      out.push({ json: { ...base, hasInvoice: true, invoiceId: invId } });\n    }\n  }\n}\nreturn out;"
+      },
+      "id": "0007-expand",
+      "name": "Expand to invoices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, -160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "h1", "leftValue": "={{$json.hasInvoice}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "0008-if-has-inv",
+      "name": "IF has invoice",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-200, -160]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://staging.txscorp.com/api/index.php/invoices/{{$json.invoiceId}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        }
+      },
+      "id": "0009-get-invoice",
+      "name": "GET invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, -260]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Each input item is a Dolibarr invoice. Look up its parent order via the\n// invoice's ref_client (which equals the eBay order number).\nconst classifyMap = new Map();\nfor (const c of $('Classify (found/missing)').all()) {\n  if (c.json.status === 'pending') classifyMap.set(c.json.orderNumber, c.json);\n}\n\nconst out = [];\nfor (const it of items) {\n  const inv = it.json;\n  if (!inv || !inv.id || !inv.ref_client) continue;\n  const ctx = classifyMap.get(inv.ref_client);\n  if (!ctx) continue;\n  const isCredit = String(inv.type) === '2';\n  let amt = Number(inv.total_ht || 0);\n  if (isCredit && amt > 0) amt = -amt;\n  out.push({ json: {\n    orderNumber: ctx.orderNumber,\n    ebayNet:     ctx.ebayNet,\n    ebayRows:    ctx.ebayRows,\n    ebayTypes:   ctx.ebayTypes,\n    dolOrderId:  ctx.dolOrderId,\n    dolOrderRef: ctx.dolOrderRef,\n    invoice: { id: inv.id, ref: inv.ref, type: isCredit ? 'credit_note' : 'invoice', totalHt: amt },\n  }});\n}\nreturn out;"
+      },
+      "id": "0010-tag-invoice",
+      "name": "Tag invoice with context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, -260]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Combine the two streams coming into this node:\n//   - per-invoice items (orders with at least one linked facture)\n//   - 'no invoice' sentinel items (orders found in Dolibarr but with 0 linked factures)\n// Group everything by orderNumber, sum invoice amounts, compute diff/status.\nconst byOrder = new Map();\nfor (const it of items) {\n  const r = it.json;\n  const key = r.orderNumber;\n  if (!byOrder.has(key)) {\n    byOrder.set(key, {\n      orderNumber: r.orderNumber,\n      ebayNet: r.ebayNet,\n      ebayRows: r.ebayRows,\n      ebayTypes: r.ebayTypes,\n      dolOrderId: r.dolOrderId,\n      dolOrderRef: r.dolOrderRef,\n      dolNet: 0,\n      invoices: [],\n    });\n  }\n  if (r.invoice) {\n    const agg = byOrder.get(key);\n    agg.dolNet += r.invoice.totalHt;\n    agg.invoices.push(r.invoice);\n  }\n}\nconst out = [];\nfor (const agg of byOrder.values()) {\n  agg.dolNet = Math.round(agg.dolNet * 100) / 100;\n  agg.diff = Math.round((agg.ebayNet - agg.dolNet) * 100) / 100;\n  if (agg.invoices.length === 0) agg.status = 'NO_LINKED_INVOICES';\n  else if (Math.abs(agg.diff) > 0.01) agg.status = 'MISMATCH';\n  else agg.status = 'MATCH';\n  out.push({ json: agg });\n}\nreturn out;"
+      },
+      "id": "0011-aggregate",
+      "name": "Aggregate by order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, -160]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "0012-merge",
+      "name": "Merge found + missing",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [600, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Final summary + filtered lists.\n// Defensively recover no-invoice rows from Expand to invoices. This keeps the\n// report correct even if the IF false branch is missing or not wired in n8n.\nconst byOrder = new Map(items.map(i => [i.json.orderNumber, i.json]));\nfor (const it of $('Expand to invoices').all()) {\n  const r = it.json;\n  if (r.hasInvoice !== false || byOrder.has(r.orderNumber)) continue;\n  byOrder.set(r.orderNumber, {\n    orderNumber: r.orderNumber,\n    ebayNet: r.ebayNet,\n    ebayRows: r.ebayRows,\n    ebayTypes: r.ebayTypes,\n    dolOrderId: r.dolOrderId,\n    dolOrderRef: r.dolOrderRef,\n    dolNet: 0,\n    diff: Math.round(r.ebayNet * 100) / 100,\n    invoices: [],\n    status: 'NO_LINKED_INVOICES',\n  });\n}\nconst all = Array.from(byOrder.values());\nconst matches  = all.filter(r => r.status === 'MATCH');\nconst mismatch = all.filter(r => r.status === 'MISMATCH');\nconst missing  = all.filter(r => r.status === 'MISSING_IN_DOLIBARR');\nconst noInv    = all.filter(r => r.status === 'NO_LINKED_INVOICES');\nreturn [{\n  json: {\n    summary: {\n      ordersCompared:    all.length,\n      matches:           matches.length,\n      mismatches:        mismatch.length,\n      missingInDolibarr: missing.length,\n      noLinkedInvoices:  noInv.length,\n    },\n    discrepancies: [...mismatch, ...missing, ...noInv],\n    matches,\n  }\n}];"
+      },
+      "id": "0013-summary",
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "0014-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1000, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Parse and Group", "type": "main", "index": 0 }]] },
+    "Parse and Group": { "main": [[{ "node": "Find SO by ref_client", "type": "main", "index": 0 }]] },
+    "Find SO by ref_client": { "main": [[{ "node": "Classify (found/missing)", "type": "main", "index": 0 }]] },
+    "Classify (found/missing)": { "main": [[{ "node": "IF order found", "type": "main", "index": 0 }]] },
+    "IF order found": {
+      "main": [
+        [{ "node": "GET order detail", "type": "main", "index": 0 }],
+        [{ "node": "Merge found + missing", "type": "main", "index": 1 }]
+      ]
+    },
+    "GET order detail": { "main": [[{ "node": "Expand to invoices", "type": "main", "index": 0 }]] },
+    "Expand to invoices": { "main": [[{ "node": "IF has invoice", "type": "main", "index": 0 }]] },
+    "IF has invoice": {
+      "main": [
+        [{ "node": "GET invoice", "type": "main", "index": 0 }],
+        [{ "node": "Aggregate by order", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET invoice": { "main": [[{ "node": "Tag invoice with context", "type": "main", "index": 0 }]] },
+    "Tag invoice with context": { "main": [[{ "node": "Aggregate by order", "type": "main", "index": 0 }]] },
+    "Aggregate by order": { "main": [[{ "node": "Merge found + missing", "type": "main", "index": 0 }]] },
+    "Merge found + missing": { "main": [[{ "node": "Build Report", "type": "main", "index": 0 }]] },
+    "Build Report": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "dolibarr-ebay-reconcile" },
+  "tags": [{ "name": "Dolibarr" }, { "name": "eBay" }, { "name": "Reconciliation" }]
+}

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1480 520" font-family="-apple-system, Segoe UI, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6772"/>
+    </marker>
+    <style>
+      .node    { stroke: #2c3138; stroke-width: 1.5; rx: 10; ry: 10; }
+      .label   { fill: #1a1a1a; font-weight: 600; text-anchor: middle; }
+      .sub     { fill: #4a5159; font-size: 11px; text-anchor: middle; }
+      .trigger { fill: #d3f1de; stroke: #1f7a3a; }
+      .file    { fill: #ead7fb; stroke: #6b3aa6; }
+      .code    { fill: #ffe2b8; stroke: #b56a00; }
+      .http    { fill: #cfe1ff; stroke: #1f56b8; }
+      .ifn     { fill: #fff2a8; stroke: #a18000; }
+      .merge   { fill: #f9c9c9; stroke: #a43c3c; }
+      .edge    { stroke: #5b6772; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .edge-t  { stroke: #2c8a44; }
+      .edge-f  { stroke: #a43c3c; stroke-dasharray: 5 4; }
+      .title   { font-size: 18px; font-weight: 700; fill: #1a1a1a; }
+      .legend  { font-size: 12px; fill: #2c3138; }
+    </style>
+  </defs>
+
+  <text x="40" y="40" class="title">eBay Payout to Dolibarr Reconciliation - n8n workflow</text>
+  <text x="40" y="62" class="sub" text-anchor="start">Match eBay Order number to Dolibarr ref_client, sum linked invoices and credit notes, surface diffs.</text>
+
+  <!-- Row 1: linear flow -->
+  <g transform="translate(0,110)">
+    <rect class="node trigger" x="40"  y="20" width="150" height="64"/>
+    <text class="label" x="115" y="50">Manual Trigger</text>
+    <text class="sub"   x="115" y="68">start workflow</text>
+
+    <rect class="node file" x="220" y="20" width="170" height="64"/>
+    <text class="label" x="305" y="46">Read eBay CSV</text>
+    <text class="sub"   x="305" y="64">$EBAY_CSV_PATH</text>
+    <text class="sub"   x="305" y="78">binary -> data</text>
+
+    <rect class="node code" x="420" y="20" width="170" height="64"/>
+    <text class="label" x="505" y="46">Parse and Group</text>
+    <text class="sub"   x="505" y="64">CSV -> [orderNumber,</text>
+    <text class="sub"   x="505" y="78">ebayNet, rows, types]</text>
+
+    <rect class="node http" x="620" y="20" width="190" height="64"/>
+    <text class="label" x="715" y="42">Find SO by ref_client</text>
+    <text class="sub"   x="715" y="60">GET /orders</text>
+    <text class="sub"   x="715" y="76">sqlfilters: t.ref_client=...</text>
+
+    <rect class="node code" x="840" y="20" width="170" height="64"/>
+    <text class="label" x="925" y="46">Classify</text>
+    <text class="sub"   x="925" y="64">found -> pending</text>
+    <text class="sub"   x="925" y="78">none -> MISSING</text>
+
+    <rect class="node ifn" x="1040" y="20" width="150" height="64"/>
+    <text class="label" x="1115" y="50">IF order found</text>
+    <text class="sub"   x="1115" y="68">status == pending</text>
+
+    <!-- edges -->
+    <path class="edge" d="M190,52 L220,52"/>
+    <path class="edge" d="M390,52 L420,52"/>
+    <path class="edge" d="M590,52 L620,52"/>
+    <path class="edge" d="M810,52 L840,52"/>
+    <path class="edge" d="M1010,52 L1040,52"/>
+  </g>
+
+  <!-- Row 2: true branch -->
+  <g transform="translate(0,230)">
+    <rect class="node http" x="1040" y="20" width="190" height="64"/>
+    <text class="label" x="1135" y="46">GET order detail</text>
+    <text class="sub"   x="1135" y="64">GET /orders/{id}</text>
+    <text class="sub"   x="1135" y="78">populates linkedObjectsIds</text>
+
+    <rect class="node code" x="800" y="20" width="220" height="64"/>
+    <text class="label" x="910" y="40">Fetch invoices and diff</text>
+    <text class="sub"   x="910" y="58">for each facture id -></text>
+    <text class="sub"   x="910" y="72">GET /invoices/{id} (credit</text>
+    <text class="sub"   x="910" y="86">notes negated)</text>
+
+    <rect class="node merge" x="580" y="20" width="180" height="64"/>
+    <text class="label" x="670" y="46">Merge found + missing</text>
+    <text class="sub"   x="670" y="64">combineAll, one item</text>
+    <text class="sub"   x="670" y="78">per eBay order</text>
+
+    <!-- True path: from IF true (top) down and right-to-left into merge -->
+    <path class="edge edge-t" d="M1115,114 L1115,250"/>
+    <text x="1120" y="135" class="sub" text-anchor="start" fill="#2c8a44">true</text>
+
+    <path class="edge" d="M1040,252 L1020,252"/>
+    <path class="edge" d="M800,252 L760,252"/>
+  </g>
+
+  <!-- Row 3: false branch + tail -->
+  <g transform="translate(0,360)">
+    <!-- False branch arrow from IF straight down to merge -->
+    <path class="edge edge-f" d="M1115,-216 L1115,-30 L760,-30 L760,-46"/>
+    <text x="1120" y="-216" class="sub" text-anchor="start" fill="#a43c3c"></text>
+    <text x="1100" y="-25" class="sub" text-anchor="end" fill="#a43c3c">false (MISSING)</text>
+
+    <rect class="node code" x="420" y="20" width="160" height="64"/>
+    <text class="label" x="500" y="46">Build Report</text>
+    <text class="sub"   x="500" y="64">summary + filtered</text>
+    <text class="sub"   x="500" y="78">discrepancies list</text>
+
+    <rect class="node file" x="220" y="20" width="180" height="64"/>
+    <text class="label" x="310" y="46">Convert to JSON file</text>
+    <text class="sub"   x="310" y="64">reconcile-report.json</text>
+
+    <rect class="node file" x="40" y="20" width="160" height="64"/>
+    <text class="label" x="120" y="46">Write report</text>
+    <text class="sub"   x="120" y="64">$RECONCILE_OUTPUT_PATH</text>
+
+    <!-- Edges from merge (in row 2) into row 3 -->
+    <path class="edge" d="M670,-46 L670,0 L580,0 L580,52"/>
+    <path class="edge" d="M420,52 L400,52"/>
+    <path class="edge" d="M220,52 L200,52"/>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(40,480)">
+    <rect class="node trigger" x="0"   y="0" width="22" height="20"/><text class="legend" x="30" y="15">Trigger</text>
+    <rect class="node file"    x="110" y="0" width="22" height="20"/><text class="legend" x="140" y="15">File I/O</text>
+    <rect class="node code"    x="220" y="0" width="22" height="20"/><text class="legend" x="250" y="15">Code</text>
+    <rect class="node http"    x="320" y="0" width="22" height="20"/><text class="legend" x="350" y="15">HTTP Request (Dolibarr API)</text>
+    <rect class="node ifn"     x="540" y="0" width="22" height="20"/><text class="legend" x="570" y="15">IF</text>
+    <rect class="node merge"   x="600" y="0" width="22" height="20"/><text class="legend" x="630" y="15">Merge</text>
+  </g>
+</svg>
