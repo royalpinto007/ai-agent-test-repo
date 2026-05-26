@@ -1,0 +1,11 @@
+--,--,--,--,--,--,--,--,--,--,--,--,--
+"Notes"
+"Gross transaction amount: The total payment for a transaction before any fees or credits are applied."
+"Gross transaction amounts and fees are listed in the transaction currency. Net amounts are listed in the payout currency."
+"All fee amounts shown include taxes."
+""
+"Transaction report"
+"This report includes transaction type","order, refund, claim, payment dispute, shipping label, charge, transfer, hold, other fee, adjustment, purchase, payout, secondary payout, withheld tax, reserve "
+"Seller","txs_corp"
+"Amount","7,553.64 USD"
+"Transaction creation date","Type","Order number","Legacy order ID","Buyer username","Buyer name","Ship to city","Ship to province/region/state","Ship to zip","Ship to country","Net amount","Payout currency","Payout date","Payout ID","Payout method","Payout status","Reason for hold","Item ID","Transaction ID","Item title","Custom label","Quantity","Item subtotal","Shipping and handling","Seller collected tax","eBay collected tax","Final Value Fee - fixed","Final Value Fee - variable","Regulatory operating fee","Very high ""item not as described"" fee","Below standard performance fee","International fee","Charity donation","Deposit processing fee","Gross transaction amount","Transaction currency","Exchange rate","Reference ID","Description"

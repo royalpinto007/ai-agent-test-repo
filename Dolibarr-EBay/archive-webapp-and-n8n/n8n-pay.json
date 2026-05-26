@@ -1,0 +1,172 @@
+{
+  "name": "eBay Reconciliation - Mark Invoices Paid",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ebay-pay",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0001-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1400, 0],
+      "webhookId": "ebay-pay"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Validate incoming payload. FastAPI sends:\n//   { orderNumber, payoutId, payoutDateUnix, paymentTypeId, bankAccountId, comment }\n// Defaults applied here so the UI can send minimal fields.\nconst body = items[0].json.body || items[0].json;\nif (!body.orderNumber) throw new Error('orderNumber is required');\nif (!body.payoutId) throw new Error('payoutId is required');\nconst dateUnix = Number(body.payoutDateUnix);\nif (!Number.isFinite(dateUnix) || dateUnix <= 0) throw new Error('payoutDateUnix must be a positive unix timestamp');\nreturn [{ json: {\n  orderNumber:    String(body.orderNumber),\n  payoutId:       String(body.payoutId),\n  payoutDateUnix: dateUnix,\n  paymentTypeId:  Number(body.paymentTypeId || 2),       // 2 = VIR / Credit Transfer\n  bankAccountId:  Number(body.bankAccountId || 1),        // 1 = CityNational in staging\n  comment:        body.comment || `eBay payout ${body.payoutId} - order ${body.orderNumber}`,\n}}];"
+      },
+      "id": "0002-validate",
+      "name": "Validate input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1200, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://staging.txscorp.com/api/index.php/invoices",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "limit", "value": "50" },
+            { "name": "sqlfilters", "value": "=(t.ref_client:=:'{{$json.orderNumber.replace(/'/g, \"''\")}}') AND (t.type:=:0) AND (t.paye:=:0)" }
+          ]
+        },
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "0003-get-unpaid",
+      "name": "GET unpaid invoices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1000, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Decide which invoices to pay. Skip any with remaintopay <= 0 (overshoot case:\n// customer is owed money; no payment to record).\nconst input = $('Validate input').first().json;\nconst out = [];\nfor (const it of items) {\n  const inv = it.json;\n  if (!inv || !inv.id) continue;\n  const remain = Number(inv.remaintopay || 0);\n  if (remain <= 0) {\n    // Pass-through marker so Shape response can count skipped\n    out.push({ json: { _skip: true, invoiceId: String(inv.id), invoiceRef: inv.ref, reason: 'remaintopay<=0', remaintopay: remain } });\n    continue;\n  }\n  out.push({ json: {\n    _skip: false,\n    invoiceId: String(inv.id),\n    invoiceRef: inv.ref,\n    amount: Math.round(remain * 100) / 100,\n    _payload: {\n      datepaye: input.payoutDateUnix,\n      paymentid: input.paymentTypeId,\n      closepaidinvoices: 'yes',\n      accountid: input.bankAccountId,\n      num_payment: input.payoutId,\n      comment: input.comment + ` (invoice ${inv.ref})`,\n    },\n  }});\n}\nreturn out;"
+      },
+      "id": "0004-plan",
+      "name": "Plan payments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-800, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "id": "amt", "leftValue": "={{ Number($json.amount || 0) }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "0005-if-pay",
+      "name": "IF should pay?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-600, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://staging.txscorp.com/api/index.php/invoices/{{$json.invoiceId}}/payments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Accept", "value": "application/json" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json._payload) }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "0006-post-payment",
+      "name": "POST payment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-400, -100]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Annotate each payment response with its invoice context.\nconst planned = $('Plan payments').all().filter(x => !x.json._skip);\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const resp = items[i].json;\n  const ctx = planned[i].json;\n  let paymentId = null;\n  if (typeof resp === 'number') paymentId = resp;\n  else if (typeof resp === 'string' && /^\\d+$/.test(resp)) paymentId = Number(resp);\n  else if (resp && typeof resp === 'object' && resp.id) paymentId = resp.id;\n  if (paymentId) {\n    out.push({ json: { ok: true, invoiceId: ctx.invoiceId, invoiceRef: ctx.invoiceRef, amount: ctx.amount, paymentId: String(paymentId) } });\n  } else {\n    const msg = (resp && resp.error && (resp.error.message || resp.error['0'])) || JSON.stringify(resp).slice(0, 200);\n    out.push({ json: { ok: false, invoiceId: ctx.invoiceId, invoiceRef: ctx.invoiceRef, amount: ctx.amount, error: msg } });\n  }\n}\nreturn out;"
+      },
+      "id": "0007-shape-payment",
+      "name": "Shape payment results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-200, -100]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "0008-merge",
+      "name": "Merge paid + skipped",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Final response: per-invoice list + counters.\nconst input = $('Validate input').first().json;\nconst all = items.map(i => i.json);\nconst paid = all.filter(x => x.ok === true);\nconst failed = all.filter(x => x.ok === false);\nconst skipped = all.filter(x => x._skip);\nreturn [{ json: {\n  ok: failed.length === 0,\n  orderNumber: input.orderNumber,\n  payoutId: input.payoutId,\n  summary: {\n    paid: paid.length,\n    skipped: skipped.length,\n    failed: failed.length,\n    totalPaid: Math.round(paid.reduce((s, x) => s + Number(x.amount || 0), 0) * 100) / 100,\n  },\n  payments: paid,\n  skipped,\n  errors: failed,\n  message: paid.length === 0 && skipped.length > 0\n    ? `Nothing to pay (${skipped.length} invoice${skipped.length === 1 ? '' : 's'} skipped: already paid or remaintopay <= 0).`\n    : `Created ${paid.length} payment${paid.length === 1 ? '' : 's'}${skipped.length ? `, skipped ${skipped.length}` : ''}${failed.length ? `, failed ${failed.length}` : ''}.`,\n}}];"
+      },
+      "id": "0009-summary",
+      "name": "Build response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "0010-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [400, 0]
+    }
+  ],
+  "connections": {
+    "Webhook":         { "main": [[{ "node": "Validate input", "type": "main", "index": 0 }]] },
+    "Validate input":  { "main": [[{ "node": "GET unpaid invoices", "type": "main", "index": 0 }]] },
+    "GET unpaid invoices": { "main": [[{ "node": "Plan payments", "type": "main", "index": 0 }]] },
+    "Plan payments":   { "main": [[{ "node": "IF should pay?", "type": "main", "index": 0 }]] },
+    "IF should pay?": {
+      "main": [
+        [{ "node": "POST payment", "type": "main", "index": 0 }],
+        [{ "node": "Merge paid + skipped", "type": "main", "index": 1 }]
+      ]
+    },
+    "POST payment":          { "main": [[{ "node": "Shape payment results", "type": "main", "index": 0 }]] },
+    "Shape payment results": { "main": [[{ "node": "Merge paid + skipped", "type": "main", "index": 0 }]] },
+    "Merge paid + skipped":  { "main": [[{ "node": "Build response", "type": "main", "index": 0 }]] },
+    "Build response":        { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "dolibarr-ebay-pay" },
+  "tags": [{ "name": "Dolibarr" }, { "name": "eBay" }, { "name": "Reconciliation" }, { "name": "Pay" }]
+}

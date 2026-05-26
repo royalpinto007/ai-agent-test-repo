@@ -1,85 +1,63 @@
 # Dolibarr ↔ eBay Reconciliation
 
-Reconciles an eBay payout CSV against Dolibarr sales orders, invoices, and credit notes.
-
-## How matching works
-
-1. Read the eBay payout CSV, find the header row (`Transaction creation date,...`).
-2. Group every row by **Order number**, summing the **Net amount** column.
-3. For each unique Order number, look up the Dolibarr Sales Order where
-   `ref_client = <Order number>` (exact match) via `GET /api/index.php/orders?sqlfilters=(t.ref_client:=:'…')`.
-4. Refetch by id (`GET /api/index.php/orders/{id}`) so `linkedObjectsIds.facture` is populated.
-   The list endpoint leaves this null.
-5. For every linked invoice / credit note id, fetch via `GET /api/index.php/invoices/{id}`,
-   sum `total_ht`. Credit notes (`type == 2`) are negated.
-6. Compare eBay net vs Dolibarr net per order; classify as `MATCH`, `MISMATCH`,
-   `MISSING_IN_DOLIBARR`, or `NO_LINKED_INVOICES`.
-
-## Web UI (recommended)
-
-```bash
-python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-export N8N_WEBHOOK_URL=https://n8n.txscorp.com/webhook/ebay-reconcile
-export DOLIBARR_URL=https://staging.txscorp.com   # only used to label the topbar
-uvicorn app:app --reload --port 8000
-```
-
-The FastAPI app no longer talks to Dolibarr directly — it forwards the uploaded
-CSV to n8n, which holds the Dolibarr API key in its Credentials store and
-performs every API call. The UI normalises the JSON response and renders the
-same summary + table + downloads.
-
-Open <http://localhost:8000>, drop the payout CSV, hit **Reconcile**. The page shows
-a summary, a filterable / sortable table of every order, and **Download CSV** /
-**Download JSON** buttons for the same report.
-
-Endpoints (also callable directly):
-- `POST /api/reconcile`     - multipart `file`, returns `{summary, results}` JSON
-- `POST /api/reconcile.csv` - same input, returns CSV download
-
-A full run against the 106-order sample CSV against `staging.txscorp.com` takes
-about 1m45s (two Dolibarr API calls per order plus one per linked invoice). The
-UI shows a spinner during the call.
-
-## CLI
-
-```bash
-export DOLIBARR_API_KEY=<key>
-export DOLIBARR_URL=https://staging.txscorp.com   # default
-
-python3 reconcile.py "eBay Payout_7461554484_TXS - 4-21-26 (1).csv"
-
-# JSON for downstream tooling
-python3 reconcile.py payout.csv --json --only mismatch > mismatches.json
-```
-
-Flags: `--tolerance 0.01`, `--only {mismatch,missing,no_invoices,all}`, `--json`.
-
-## n8n workflow
-
-- `n8n-reconcile.json` — importable workflow.
-- `n8n-reconcile.svg` — rendered node graph.
-
-Required env vars on the n8n instance: `DOLIBARR_URL`, `DOLIBARR_API_KEY`,
-`EBAY_CSV_PATH`, optionally `RECONCILE_OUTPUT_PATH` (defaults to `/tmp/reconcile-report.json`).
-
-Node flow:
-
-![workflow](n8n-reconcile.svg)
-
-## Sample run (Apr 21, 2026 payout)
+A native **Dolibarr module** that reconciles eBay payouts against Dolibarr
+invoices, lets you fix any mismatches with one click, and records payments —
+all inside Dolibarr, no external services.
 
 ```
-Orders compared       : 106
-Matches (|diff| <= 0.01): 40
-Mismatches            : 52
-Missing in Dolibarr   : 11
-No linked invoices    : 3
+   1. Upload          2. Review         3. Fix              4. Pay
+   ───────────       ──────────         ─────────           ─────────
+   eBay payout CSV → Reconciliation  → Resolve any        → Pay all matches
+                     table             mismatches /
+                                       missing rows
 ```
 
-The 52 mismatches are dominated by orders whose sale settled in a *previous* payout
-but whose fees (Promoted Listings, FVF) appear in this payout — so the eBay net here
-is a small negative fee delta while Dolibarr still carries the full invoice total.
-That is the reconciliation gap the user wants visibility into.
+## Install
+
+The module is packaged as **[`ebayreconcile-1.0.1.zip`](ebayreconcile-1.0.1.zip)** —
+upload it through Dolibarr's "Deploy/install external module from file"
+admin page. See [the module README](dolibarr-module-ebayreconcile/README.md)
+for the full install / setup / permissions guide.
+
+Once installed, find it in the left menu under **Bank/Cash → eBay payouts**.
+
+## Documentation
+
+| Doc | For whom |
+|-----|----------|
+| [Setup Guide](docs/SETUP.md) | Install + configure the module: zip upload, defaults, permissions |
+| [User Guide](docs/USER_GUIDE.md) | Day-to-day: every screen, every status, every button — in plain English |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common error messages and fixes |
+| [Module README](dolibarr-module-ebayreconcile/README.md) | Inside the module folder — Dolibarr classes used, file layout, version-compatibility notes |
+
+## What's in this folder
+
+| Path | What it is |
+|------|------------|
+| **`dolibarr-module-ebayreconcile/`** | The module source — copy into `htdocs/custom/ebayreconcile/` if you prefer manual install |
+| **`ebayreconcile-1.0.1.zip`** | Packaged module for upload via Dolibarr's module installer |
+| `docs/` | The user guide + troubleshooting docs |
+| `eBay Payout_7461554484_TXS - 4-21-26 (1).csv` | Sample CSV for testing |
+| `archive-webapp-and-n8n/` | Previous standalone Python/FastAPI + n8n implementation — kept for historical reference, no longer the recommended deployment |
+
+## Why a module instead of an external app
+
+The previous version was a Python FastAPI web app that called n8n webhooks
+that called the Dolibarr REST API. That worked but had four moving parts:
+Python, n8n, FastAPI, and the Dolibarr API. Every action was three
+network hops.
+
+This version is **pure PHP inside Dolibarr**. It uses Dolibarr's own classes
+(`Facture`, `Commande`, `Paiement`, `DiscountAbsolute`) directly — no
+network calls, no shared credentials, no separate hosting. Actions run as
+the logged-in Dolibarr user, respect entity isolation, and produce the
+same audit-log entries you'd get if a human did it through Dolibarr's UI.
+
+| | Web-app version (archived) | Module (this version) |
+|---|---|---|
+| Where it runs | Separate server (Python + uvicorn) | Inside Dolibarr |
+| Auth | n8n holds the API key | Uses the logged-in user's permissions |
+| Deps | Python 3.12, FastAPI, ngrok, n8n, 4 workflows | Dolibarr 18+ |
+| Setup | env vars + 4 n8n workflow imports + credential wiring | Upload one zip, enable, done |
+| Network hops per action | 3 (browser → FastAPI → n8n → Dolibarr) | 0 |
+| Audit trail | None (n8n's webhook history only) | Native Dolibarr audit log |

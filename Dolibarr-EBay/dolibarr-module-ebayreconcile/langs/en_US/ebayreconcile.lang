@@ -1,0 +1,72 @@
+ModuleEbayReconcileName=eBay Reconciliation
+ModuleEbayReconcileDesc=Reconcile eBay payouts against Dolibarr invoices
+
+# Menu
+EbayPayouts=eBay payouts
+ReconcileAPayout=Reconcile a payout
+PayoutsHistory=Payouts history
+
+# Page titles
+ReconcilePageTitle=eBay payout reconciliation
+HistoryPageTitle=eBay payouts history
+SetupPageTitle=eBay reconciliation setup
+
+# Upload
+UploadPayoutCsv=Upload eBay payout CSV
+DropOrBrowse=Drop the eBay payout CSV here or click to browse
+PayoutMatchExplain=Matches Order number to Dolibarr ref_client, sums linked invoices and credit notes.
+Reconcile=Reconcile
+Reconciling=Reconciling, this may take a minute...
+
+# Summary tiles
+Orders=Orders
+Matches=Matches
+Mismatches=Mismatches
+MissingInDolibarr=Missing
+NoLinkedInvoices=No invoices
+
+# Statuses
+StatusMATCH=Match
+StatusMISMATCH=Mismatch
+StatusMISSING_IN_DOLIBARR=Missing
+StatusNO_LINKED_INVOICES=No invoices
+
+# Table columns
+ColStatus=Status
+ColOrderNumber=Order number
+ColEbayNet=eBay net
+ColDolibarrNet=Dolibarr net
+ColDiff=Diff
+ColSORef=SO ref
+ColInvoices=Invoices / credit notes
+ColNotes=Notes
+ColAction=Action
+
+# Actions
+Approve=Approve
+ApproveAllMismatches=Approve all mismatches
+CreateInvoice=Create invoice
+PayAll=Pay all
+Confirm=Confirm
+Cancel=Cancel
+Retry=Retry
+
+# Modal text
+ApproveModalTitle=Approve reconciliation adjustment
+ApproveModalNote=Confirm will create + validate the document in Dolibarr, and for credit notes also apply it as a discount on the source invoice.
+CreateInvoiceModalTitle=Create missing invoice
+CreateInvoiceModalNote=Confirm will create the invoice in Dolibarr (one line per CSV row), then validate it.
+BulkApproveModalTitle=Approve all mismatches
+BulkApproveModalNote=Each will be created, validated, and (for credit notes) applied to the source invoice in Dolibarr.
+
+# Setup
+SetupDefaultSocid=Default eBay customer (socid)
+SetupDefaultSocidHelp=Customer record under which "Missing" invoices are created (no SO existed).
+SetupBankAccount=Bank account
+SetupBankAccountHelp=Bank account to credit payments against.
+SetupPaymentType=Payment type
+SetupPaymentTypeHelp=Payment method recorded on each payment (typically VIR / Credit Transfer).
+SetupMatchTolerance=Match tolerance
+SetupMatchToleranceHelp=Absolute difference below this is treated as MATCH.
+Save=Save
+SetupSaved=Settings saved.
