@@ -276,14 +276,138 @@ every individual payment with clickable SO / invoice refs.
 
 ---
 
-### Remaining tests (no screenshots yet)
+### 4. `01-tiny-positive.csv` — simplest happy path
 
-4. **`01-tiny-positive.csv`** — simplest happy path. One row, one order. If anything in the rendering pipeline is broken, this surfaces it.
-5. **`02-tiny-negative.csv`** — same but negative net. Tests diff sign rendering.
-6. **`03-multi-row-order.csv`** — confirm the per-row breakdown shows under the eBay net cell (4 rows summing visibly).
-7. **`08-all-synthetic.csv`** — 5 guaranteed-missing rows. Click **Create invoice** on one of them and confirm the new invoice appears in Dolibarr under your default eBay customer (socid 3657).
-8. **`04-small-mixed.csv`** — 5 mixed-sign real orders. Test Approve on any MISMATCH, then click Pay all.
-9. **`07-large-amounts.csv`** — verify $500+ amounts render correctly.
-10. **`09-medium-mixed.csv`** — 25-order dress rehearsal.
-11. **`06-negative-only.csv`** — heavier credit-note creation stress test.
-12. **`05-positive-only.csv`** — bulk Approve happy path.
+One row, one order, positive eBay net. If anything in the rendering pipeline is broken, this surfaces it.
+
+**Initial** — reconciliation result. Single MISMATCH row with eBay net `0.43` and Dolibarr net `0.00`:
+
+![Test 01 — initial](../docs/screenshots/test-01-tiny-positive-initial.png)
+
+**Confirm** — click **Approve** on the row, preview modal opens showing the credit note we're about to create:
+
+![Test 01 — approve confirm](../docs/screenshots/test-01-tiny-positive-confirm.png)
+
+**Final** — after Confirm and Pay all. Row shows the new CN ref + `PAID` chip:
+
+![Test 01 — final](../docs/screenshots/test-01-tiny-positive-final.png)
+
+### 5. `02-tiny-negative.csv` — same flow, negative diff direction
+
+Single order with negative eBay net. Tests that negative diff rendering and credit-note direction work end-to-end.
+
+**Initial** — MISMATCH with negative diff:
+
+![Test 02 — initial](../docs/screenshots/test-02-tiny-negative-initial.png)
+
+**Confirm** — approve preview, credit note this time:
+
+![Test 02 — approve confirm](../docs/screenshots/test-02-tiny-negative-confirm.png)
+
+**Final** — after Approve + Pay all:
+
+![Test 02 — final](../docs/screenshots/test-02-tiny-negative-final.png)
+
+### 6. `03-multi-row-order.csv` — per-row breakdown + zero-net case
+
+One order with 4 CSV rows summing to **exactly zero**. Confirms the per-row breakdown displays under the eBay net cell, and confirms the zero-balance behaviour (no payment needed).
+
+**Initial** — single row, but eBay net shows the breakdown of 4 underlying CSV rows:
+
+![Test 03 — initial](../docs/screenshots/test-03-multi-row-order-initial.png)
+
+**Confirm** — approve preview:
+
+![Test 03 — approve confirm](../docs/screenshots/test-03-multi-row-order-confirm.png)
+
+**Final** — after Approve and Pay all. Note the `no balance` chip — eBay net is 0, so there was nothing to pay (no failure, the module correctly classified this as a no-op):
+
+![Test 03 — final](../docs/screenshots/test-03-multi-row-order-final.png)
+
+### 7. `08-all-synthetic.csv` — five fake orders, all MISSING_IN_DOLIBARR
+
+5 invented order numbers (`99-FAKE-…`) that don't exist in Dolibarr. Confirms the **Create all invoices** bulk path under your default eBay customer.
+
+**Initial** — 5 MISSING rows, each with its own row of per-CSV breakdown:
+
+![Test 08 — initial](../docs/screenshots/test-08-all-synthetic-initial.png)
+
+**Middle** — click **Create all invoices (5)** in the toolbar, watch them turn green:
+
+![Test 08 — after create](../docs/screenshots/test-08-all-synthetic-middle.png)
+
+**Confirm** — the per-row Create modal showing the line items it'll build (one CSV row per invoice line):
+
+![Test 08 — create confirm](../docs/screenshots/test-08-all-synthetic-confirm.png)
+
+**Final** — after **Pay all**. Three rows paid, two with `no balance` (one zero-net, one refund-only):
+
+![Test 08 — final](../docs/screenshots/test-08-all-synthetic-final.png)
+
+### 8. `04-small-mixed.csv` — 5 mixed-sign real orders
+
+Tests typical mixed-status reconciliation in miniature: a couple of MATCH, some MISMATCH, some MISSING.
+
+**Initial** — 5 rows, all statuses represented:
+
+![Test 04 — initial](../docs/screenshots/test-04-small-mixed-initial.png)
+
+**Middle** — after Approve / Create invoice on the non-matches:
+
+![Test 04 — after fixes](../docs/screenshots/test-04-small-mixed-middle.png)
+
+**Final** — after Pay all. All rows resolved:
+
+![Test 04 — final](../docs/screenshots/test-04-small-mixed-final.png)
+
+### 9. `07-large-amounts.csv` — five $500+ orders
+
+Tests number formatting on larger amounts.
+
+**Initial** — 5 high-value rows. eBay nets in the hundreds:
+
+![Test 07 — initial](../docs/screenshots/test-07-large-amounts-initial.png)
+
+**Middle** — after fixes:
+
+![Test 07 — middle](../docs/screenshots/test-07-large-amounts-middle.png)
+
+**Final** — totals reconciled and paid:
+
+![Test 07 — final](../docs/screenshots/test-07-large-amounts-final.png)
+
+### 10. `09-medium-mixed.csv` — 25-order dress rehearsal
+
+Largest scenario before the full 106. Tests bulk operations under realistic load.
+
+**Initial** — full mix of statuses across 25 rows:
+
+![Test 09 — initial](../docs/screenshots/test-09-medium-mixed-initial.png)
+
+**Final** — after bulk Approve + bulk Create + Pay all. Most rows are green with chips; the remaining ones are settled with `no balance` or have a `pay failed` chip if Dolibarr rejected anything:
+
+![Test 09 — final](../docs/screenshots/test-09-medium-mixed-final.png)
+
+### 11. `06-negative-only.csv` — heavy credit-note stress test
+
+All 22 negative-net orders from the original payout. The biggest credit-note creation run in the suite.
+
+**Initial** — 22 rows, all with negative diffs (refunds and fees dominate):
+
+![Test 06 — initial](../docs/screenshots/test-06-negative-only-initial.png)
+
+**Final** — after Approve all + Pay all:
+
+![Test 06 — final](../docs/screenshots/test-06-negative-only-final.png)
+
+### 12. `05-positive-only.csv` — bulk Approve happy path
+
+10 highest-positive-net orders. Cleanest test of the bulk Approve flow — no missing-customer surprises, no zero-amount edge cases.
+
+**Initial** — 10 rows, all positive:
+
+![Test 05 — initial](../docs/screenshots/test-05-positive-only-initial.png)
+
+**Final** — after bulk Approve + Pay all:
+
+![Test 05 — final](../docs/screenshots/test-05-positive-only-final.png)

@@ -527,7 +527,17 @@
                         if (data && data.summary && data.summary.paid > 0) ok++;
                         else if (data && data.summary && data.summary.failed > 0) fail++;
                         else noop++;
-                    }).catch(function () { fail++; }).then(function () {
+                    }).catch(function (err) {
+                        // Always mark the row as attempted, so it's removed from
+                        // rowsToPay() and the bulk counter doesn't linger at "1"
+                        // after a transient network/parse error.
+                        row._paid = {
+                            ok: false,
+                            summary: { paid: 0, failed: 1, skipped: 0, totalPaid: 0 },
+                            error: (err && err.message) ? err.message : 'unknown'
+                        };
+                        fail++;
+                    }).then(function () {
                         done++; render(); next();
                     });
                 }
