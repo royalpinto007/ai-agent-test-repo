@@ -133,7 +133,33 @@
 .ebr-toast.err { background: #b3261e; }
 .ebr-toast a { color: #fff; text-decoration: underline; }
 
-/* Detail row on history page */
-.ebr-detail td { background: #fafbfc; padding: 0 !important; }
+/* History page table — explicit column widths so right-aligned numeric
+   cells visually sit close to their headers rather than floating off in
+   excess whitespace. */
+.ebr-history-table { table-layout: fixed; }
+.ebr-history-table th, .ebr-history-table td {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Detail row on history page.
+   The outer <td colspan> holds the inner table; we want it to have zero
+   padding so the inner table flows edge-to-edge under .ebr-detail-inner.
+   But we used to write `.ebr-detail td` which also cascaded into the
+   inner table's <td> cells and crushed them flat (no padding → Payment
+   id column unreadable). Direct-child combinator scopes the reset. */
+.ebr-detail > td { background: #fafbfc; padding: 0 !important; }
 .ebr-detail-inner { padding: 8px 14px; }
+.ebr-detail-inner table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ebr-detail-inner th {
+    text-align: left; font-weight: 600; color: #6a7378;
+    padding: 5px 8px; border-bottom: 1px solid #d8dde1;
+    background: #f1f5f7;
+}
+.ebr-detail-inner th.num { text-align: right; }
+.ebr-detail-inner td {
+    padding: 5px 8px; border-bottom: 1px solid var(--softborder);
+    vertical-align: middle;
+}
+.ebr-detail-inner td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ebr-detail-inner td code { background: #eef3f5; padding: 1px 6px; border-radius: 3px; font-size: 11.5px; }
 .ebr-toggle { cursor: pointer; }

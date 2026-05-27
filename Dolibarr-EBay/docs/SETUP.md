@@ -28,7 +28,7 @@ That's the entire dependency list. No Python, no n8n, no separate server.
 
 **3.** Find **"Deploy/install external module from file"** (button or tab near the top of the modules list).
 
-**4.** Upload **[`ebayreconcile-1.0.6.zip`](../ebayreconcile-1.0.6.zip)** from this repo.
+**4.** Upload **[`ebayreconcile-1.0.7.zip`](../ebayreconcile-1.0.7.zip)** from this repo.
 
 > Filename matters. Dolibarr requires `<modulename>-<version>.zip`. Don't rename it.
 
@@ -47,7 +47,7 @@ If `htdocs/custom/` isn't writable by the web server (some hardened installs):
 ```bash
 # On the Dolibarr server (or via SCP):
 cd /path/to/htdocs/custom
-unzip /path/to/ebayreconcile-1.0.6.zip
+unzip /path/to/ebayreconcile-1.0.7.zip
 chown -R www-data:www-data ebayreconcile        # adjust user/group to your setup
 chmod -R u+rwX,g+rX,o+rX ebayreconcile
 ```

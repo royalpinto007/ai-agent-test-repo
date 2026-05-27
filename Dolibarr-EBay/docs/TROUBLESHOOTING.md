@@ -18,7 +18,7 @@ exceptions come back as text we can pinpoint.
 **Why:** Dolibarr enforces the pattern `<modulename>-<version>.zip`. A bare
 `ebayreconcile.zip` is rejected.
 
-**Fix:** Use the file named `ebayreconcile-1.0.6.zip` from this repo. Don't
+**Fix:** Use the file named `ebayreconcile-1.0.7.zip` from this repo. Don't
 rename it.
 
 ---

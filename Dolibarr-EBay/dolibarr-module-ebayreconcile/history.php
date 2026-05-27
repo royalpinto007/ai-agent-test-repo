@@ -31,7 +31,20 @@ if (!$rs || $db->num_rows($rs) === 0) {
     print '<div class="ebr-empty">No payouts settled yet. Reconcile a payout and click <strong>Pay all</strong> — it will show up here.</div>';
 } else {
     print '<div class="ebr-tablewrap">';
-    print '<table class="liste ebr-table">';
+    print '<table class="liste ebr-table ebr-history-table">';
+    // Explicit column widths so the table doesn't sprawl into empty
+    // whitespace and numeric cells stay visually next to their headers.
+    print '<colgroup>';
+    print '<col style="width:130px"/>'; // Payout ID
+    print '<col style="width:100px"/>'; // Payout date
+    print '<col />';                     // Method (flex)
+    print '<col style="width:70px"/>';  // Orders
+    print '<col style="width:80px"/>';  // Payments
+    print '<col style="width:90px"/>';  // Total paid
+    print '<col style="width:140px"/>'; // Settled at
+    print '<col style="width:120px"/>'; // By
+    print '<col style="width:70px"/>';  // details link
+    print '</colgroup>';
     print '<thead><tr class="liste_titre">';
     print '<th>Payout ID</th><th>Payout date</th><th>Method</th>';
     print '<th class="num">Orders</th><th class="num">Payments</th><th class="num">Total paid</th>';
@@ -62,24 +75,38 @@ if (!$rs || $db->num_rows($rs) === 0) {
         print '<td><a class="ebr-toggle" data-detail="'.$idx.'" href="javascript:;">details ▾</a></td>';
         print '</tr>';
 
-        // Detail row (hidden by default)
+        // Detail row (hidden by default).
+        // The <td colspan> is styled with `padding: 0` via .ebr-detail > td so
+        // the inner table flows under the explicit padding from .ebr-detail-inner.
         print '<tr class="ebr-detail" data-detail="'.$idx.'" hidden><td colspan="9"><div class="ebr-detail-inner">';
         if (empty($items)) {
             print '<em>No per-payment data recorded for this entry.</em>';
         } else {
-            print '<table style="width:100%;font-size:11.5px;">';
-            print '<thead><tr><th>Order</th><th>SO ref</th><th>Invoice</th><th class="num">Amount</th><th>Payment id</th></tr></thead><tbody>';
+            print '<table>';
+            print '<thead><tr>';
+            print '<th>Order number</th>';
+            print '<th>SO ref</th>';
+            print '<th>Invoice</th>';
+            print '<th class="num">Amount</th>';
+            print '<th>Payment ID</th>';
+            print '</tr></thead><tbody>';
             foreach ($items as $it) {
                 $soRef = $it['soRef'] ?? '-';
                 $soUrl = !empty($it['soId']) ? DOL_URL_ROOT.'/commande/card.php?id='.(int)$it['soId'] : null;
                 $invRef = $it['invoiceRef'] ?? '-';
                 $invUrl = !empty($it['invoiceId']) ? DOL_URL_ROOT.'/compta/facture/card.php?id='.(int)$it['invoiceId'] : null;
+                $payId = $it['paymentId'] ?? '';
+                $payUrl = !empty($payId) && ctype_digit((string)$payId)
+                    ? DOL_URL_ROOT.'/compta/paiement/card.php?id='.(int)$payId
+                    : null;
                 print '<tr>';
                 print '<td>'.dol_escape_htmltag($it['orderNumber'] ?? '-').'</td>';
                 print '<td>'.($soUrl ? '<a href="'.$soUrl.'" target="_blank">'.dol_escape_htmltag($soRef).'</a>' : dol_escape_htmltag($soRef)).'</td>';
                 print '<td>'.($invUrl ? '<a href="'.$invUrl.'" target="_blank">'.dol_escape_htmltag($invRef).'</a>' : dol_escape_htmltag($invRef)).'</td>';
                 print '<td class="num">'.price((float)($it['amount'] ?? 0)).'</td>';
-                print '<td><code>'.dol_escape_htmltag($it['paymentId'] ?? '-').'</code></td>';
+                print '<td>'.($payUrl
+                    ? '<a href="'.$payUrl.'" target="_blank"><code>'.dol_escape_htmltag($payId).'</code></a>'
+                    : '<code>'.dol_escape_htmltag($payId ?: '-').'</code>').'</td>';
                 print '</tr>';
             }
             print '</tbody></table>';

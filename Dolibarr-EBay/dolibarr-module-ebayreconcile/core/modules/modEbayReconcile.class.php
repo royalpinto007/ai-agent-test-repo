@@ -28,7 +28,7 @@ class modEbayReconcile extends DolibarrModules
         $this->descriptionlong = "Upload an eBay payout CSV, match each order to its Dolibarr Sales Order, create credit notes or missing invoices for any discrepancies, and record payments using the payout's own ID and date.";
         $this->editor_name = 'TXS Corp';
         $this->editor_url = 'https://staging.txscorp.com';
-        $this->version = '1.0.6';
+        $this->version = '1.0.7';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bank_account';
 
