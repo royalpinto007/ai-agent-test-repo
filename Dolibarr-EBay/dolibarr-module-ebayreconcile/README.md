@@ -16,7 +16,7 @@ own classes.
 ### Option A — through Dolibarr's Module Installer (zip upload)
 
 1. **Home → Setup → Modules/Applications → Deploy/install external module from file**.
-2. Upload `ebayreconcile-1.0.4.zip`.
+2. Upload `ebayreconcile-1.0.5.zip`.
 3. Activate **eBay Reconciliation** in the modules list (the green toggle).
 4. **Home → Setup → Modules/Applications → eBay Reconciliation → Setup** to
    review the defaults (default eBay customer socid, bank account id, payment

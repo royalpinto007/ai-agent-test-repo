@@ -130,6 +130,12 @@
             return r.status === 'MISMATCH' && !r._adjusted && pickLargestInvoice(r);
         });
     }
+    function eligibleCreates() {
+        return state.results.filter(function (r) {
+            return (r.status === 'MISSING_IN_DOLIBARR' || r.status === 'NO_LINKED_INVOICES')
+                && !r._adjusted;
+        });
+    }
 
     // ---------- Rendering ----------
 
@@ -199,6 +205,14 @@
             var n = eligibleMismatches().length;
             bulkA.hidden = !state.writePerm || n === 0;
             bulkA.textContent = 'Approve all mismatches (' + n + ')';
+        }
+        var bulkC = document.getElementById('ebrBulkCreate');
+        if (bulkC) {
+            var nc = eligibleCreates().length;
+            // Only show when there are 2+ rows to create — single rows use the
+            // per-row Create invoice button.
+            bulkC.hidden = !state.writePerm || nc < 2;
+            bulkC.textContent = 'Create all invoices (' + nc + ')';
         }
         var bulkP = document.getElementById('ebrBulkPay');
         if (bulkP) {
@@ -285,8 +299,11 @@
             '<dt>Will create</dt><dd>' + actionLabel + ' for <strong>' + amount.toFixed(2) + '</strong></dd>' +
             '<dt>Linked to</dt><dd><code>' + esc(target.ref) + '</code> <span class="ebr-sub">(id ' + target.id + ')</span></dd>';
 
-        document.getElementById('ebrApproveConfirm').onclick = confirmApprove;
-        document.getElementById('ebrApproveCancel').onclick  = function () { modal.classList.remove('open'); };
+        var confirmBtn = document.getElementById('ebrApproveConfirm');
+        confirmBtn.onclick = confirmApprove;
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm';
+        document.getElementById('ebrApproveCancel').onclick = function () { modal.classList.remove('open'); };
         document.getElementById('ebrApproveErr').hidden = true;
         modal.classList.add('open');
     }
@@ -353,8 +370,11 @@
             '<dt>Total</dt><dd><strong>' + fmt(r.ebay_net) + '</strong></dd>' +
             '<dt>Lines (' + lines.length + ')</dt><dd><div style="max-height:140px;overflow:auto;">' + linesHtml + '</div></dd>';
 
-        document.getElementById('ebrCreateConfirm').onclick = confirmCreate;
-        document.getElementById('ebrCreateCancel').onclick  = function () { modal.classList.remove('open'); };
+        var confirmBtn = document.getElementById('ebrCreateConfirm');
+        confirmBtn.onclick = confirmCreate;
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm';
+        document.getElementById('ebrCreateCancel').onclick = function () { modal.classList.remove('open'); };
         document.getElementById('ebrCreateErr').hidden = true;
         modal.classList.add('open');
     }
@@ -424,6 +444,55 @@
         }
         Promise.all([worker(), worker(), worker()]).then(function () {
             showToast('Bulk approve done: ' + ok + ' ok, ' + fail + ' failed', fail > 0);
+        });
+    }
+
+    function runBulkCreate() {
+        var elig = eligibleCreates().map(function (r) {
+            var hasSO = r.status === 'NO_LINKED_INVOICES';
+            var lines = (r.ebay_lines && r.ebay_lines.length > 0)
+                ? r.ebay_lines
+                : [{ date: '', type: 'eBay sale', description: r.order_number, net: r.ebay_net }];
+            return {
+                row: r,
+                payload: {
+                    orderNumber: r.order_number,
+                    ebayNet: r.ebay_net,
+                    lines: lines,
+                    parentSoId: hasSO ? r.dolibarr_order_id : null,
+                },
+            };
+        });
+        if (!elig.length) return;
+        if (!confirm('Create ' + elig.length + ' invoice(s)?')) return;
+        showToast('Creating ' + elig.length + ' invoice(s)...', false);
+        var ok = 0, fail = 0;
+        var cursor = 0;
+        function worker() {
+            return new Promise(function (resolve) {
+                function next() {
+                    if (cursor >= elig.length) return resolve();
+                    var item = elig[cursor++];
+                    jpost('create_invoice', item.payload).then(function (data) {
+                        if (data && data.ok) {
+                            item.row._adjusted = {
+                                action: 'invoice',
+                                newInvoiceId: data.newInvoiceId,
+                                newInvoiceRef: data.newInvoiceRef,
+                                applied: false,
+                                dolibarrEditUrl: data.dolibarrEditUrl,
+                            };
+                            ok++;
+                        } else { fail++; }
+                    }).catch(function () { fail++; }).then(function () {
+                        render(); next();
+                    });
+                }
+                next();
+            });
+        }
+        Promise.all([worker(), worker(), worker()]).then(function () {
+            showToast('Bulk create done: ' + ok + ' created, ' + fail + ' failed', fail > 0);
         });
     }
 
@@ -549,6 +618,8 @@
 
     var bA = document.getElementById('ebrBulkApprove');
     if (bA) bA.addEventListener('click', runBulkApprove);
+    var bC = document.getElementById('ebrBulkCreate');
+    if (bC) bC.addEventListener('click', runBulkCreate);
     var bP = document.getElementById('ebrBulkPay');
     if (bP) bP.addEventListener('click', runBulkPay);
 

@@ -124,6 +124,7 @@ if ($reconcileResult) {
     print '<span class="ebr-spacer"></span>';
     if ($user->rights->ebayreconcile->write) {
         print '<button class="butAction" id="ebrBulkApprove" type="button" hidden>'.$langs->trans("ApproveAllMismatches").'</button>';
+        print '<button class="butAction" id="ebrBulkCreate" type="button" hidden>Create all invoices</button>';
         print '<button class="butAction" id="ebrBulkPay" type="button" hidden>'.$langs->trans("PayAll").'</button>';
     }
     print '<button class="button" id="ebrDlCsv"  type="button">CSV</button> ';
