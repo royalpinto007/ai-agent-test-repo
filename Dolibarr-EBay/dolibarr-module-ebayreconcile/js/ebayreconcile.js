@@ -85,6 +85,10 @@
             var p = r._paid;
             if (p.summary && p.summary.paid > 0) {
                 parts.push('<span class="ebr-actiontag paid"><i class="fa fa-money-check-alt"></i> paid ' + (p.summary.totalPaid||0).toFixed(2) + '</span>');
+            } else if (p.summary && p.summary.failed > 0) {
+                parts.push('<span class="ebr-actiontag notapplied"><i class="fa fa-exclamation-triangle"></i> pay failed</span>');
+            } else if (p.summary && p.summary.skipped > 0) {
+                parts.push('<span class="ebr-actiontag"><i class="fa fa-check"></i> no balance</span>');
             }
         }
         if (parts.length) return parts.join(' ');
@@ -432,7 +436,7 @@
         if (!elig.length) return;
         if (!confirm('Pay ' + elig.length + ' order(s) using payout ' + state.payout.id + '?')) return;
         showToast('Paying ' + elig.length + '...', false);
-        var done = 0, ok = 0, fail = 0;
+        var done = 0, ok = 0, fail = 0, noop = 0;
         var cursor = 0;
         function worker() {
             return new Promise(function (resolve) {
@@ -446,8 +450,14 @@
                     };
                     jpost('pay', payload).then(function (data) {
                         row._paid = data;
+                        // Three distinct outcomes:
+                        //   - paid > 0:   real payment recorded → ok
+                        //   - failed > 0: something errored in Dolibarr → fail
+                        //   - paid = 0, failed = 0, skipped > 0: nothing to pay
+                        //     (already paid or zero-balance invoice) → no-op
                         if (data && data.summary && data.summary.paid > 0) ok++;
-                        else fail++;
+                        else if (data && data.summary && data.summary.failed > 0) fail++;
+                        else noop++;
                     }).catch(function () { fail++; }).then(function () {
                         done++; render(); next();
                     });
@@ -457,7 +467,10 @@
         }
         Promise.all([worker(), worker(), worker()]).then(function () {
             if (ok > 0) savePayoutSummary().catch(function(){});
-            showToast('Bulk pay done: ' + ok + ' paid, ' + fail + ' failed', fail > 0);
+            var bits = [ok + ' paid'];
+            if (fail > 0) bits.push(fail + ' failed');
+            if (noop > 0) bits.push(noop + ' nothing to pay');
+            showToast('Bulk pay done: ' + bits.join(', '), fail > 0);
         });
     }
 

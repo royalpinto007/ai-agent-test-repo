@@ -18,7 +18,7 @@ exceptions come back as text we can pinpoint.
 **Why:** Dolibarr enforces the pattern `<modulename>-<version>.zip`. A bare
 `ebayreconcile.zip` is rejected.
 
-**Fix:** Use the file named `ebayreconcile-1.0.0.zip` from this repo. Don't
+**Fix:** Use the file named `ebayreconcile-1.0.4.zip` from this repo. Don't
 rename it.
 
 ---
@@ -189,8 +189,19 @@ Bank account id. (Find it under Bank → Accounts → click → URL `id=N`.)
 ### Invoice already paid
 
 If you click Pay all twice on the same row, the second time you'll see "0
-paid, 1 skipped" — the module skips already-paid invoices. That's correct
-behaviour, not an error.
+paid, 1 nothing to pay" — the module skips already-paid invoices. That's
+correct behaviour, not an error.
+
+### Zero-amount invoice (eBay net = 0)
+
+If a payout includes an order whose net sums to exactly zero (e.g. a refund
+that perfectly cancels a sale), the "Create invoice" step makes an invoice
+totalling 0. There's no balance to settle, so Pay all reports it as
+"nothing to pay" — also correct behaviour. The Action column shows a
+*"no balance"* chip rather than a *"paid"* one.
+
+Before v1.0.4, this was misleadingly reported as "1 failed" in the bulk
+toast. Upgrade if you're seeing that on zero-amount orders.
 
 ---
 

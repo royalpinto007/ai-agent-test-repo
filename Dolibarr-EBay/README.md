@@ -14,7 +14,7 @@ all inside Dolibarr, no external services.
 
 ## Install
 
-The module is packaged as **[`ebayreconcile-1.0.1.zip`](ebayreconcile-1.0.1.zip)** —
+The module is packaged as **[`ebayreconcile-1.0.4.zip`](ebayreconcile-1.0.4.zip)** —
 upload it through Dolibarr's "Deploy/install external module from file"
 admin page. See [the module README](dolibarr-module-ebayreconcile/README.md)
 for the full install / setup / permissions guide.
@@ -35,7 +35,7 @@ Once installed, find it in the left menu under **Bank/Cash → eBay payouts**.
 | Path | What it is |
 |------|------------|
 | **`dolibarr-module-ebayreconcile/`** | The module source — copy into `htdocs/custom/ebayreconcile/` if you prefer manual install |
-| **`ebayreconcile-1.0.1.zip`** | Packaged module for upload via Dolibarr's module installer |
+| **`ebayreconcile-1.0.4.zip`** | Packaged module for upload via Dolibarr's module installer |
 | `docs/` | The user guide + troubleshooting docs |
 | `eBay Payout_7461554484_TXS - 4-21-26 (1).csv` | Sample CSV for testing |
 | `archive-webapp-and-n8n/` | Previous standalone Python/FastAPI + n8n implementation — kept for historical reference, no longer the recommended deployment |
