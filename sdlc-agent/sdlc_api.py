@@ -549,9 +549,11 @@ def test_evidence():
         try:
             png = _b64.b64decode(s["b64"])
             path = f"test-evidence/issue-{issue_number}/{s['name']}"
-            url = upload_file_to_github(owner, repo, token, path, png, f"test evidence for #{issue_number}")
-            if url:
-                links.append((s["name"], url))
+            uploaded = upload_file_to_github(owner, repo, token, path, png, f"test evidence for #{issue_number}")
+            if uploaded:
+                # clean public raw URL (no expiring token) — renders inline in comments
+                clean_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/{path}"
+                links.append((s["name"], clean_url))
         except Exception:
             pass
 
