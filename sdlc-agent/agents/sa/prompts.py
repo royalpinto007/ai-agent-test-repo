@@ -33,6 +33,20 @@ FILE TREE:
 - [risk] — Mitigation: [one line]
 (max 3 risks — omit section if none)
 
+## Impact Analysis
+What else could this change affect — beyond the files being edited? Think about shared code, callers, data, and tenant isolation.
+
+| Area / Module | Why it may be impacted | Risk |
+|---------------|------------------------|------|
+| [module or feature] | [shared function changed / data shape changed / permission path touched] | Low/Med/High |
+
+(max 5 rows — call out cross-company/tenant isolation, shared helpers, DB schema, and anything that other features depend on)
+
+## Additional Tests to Run
+Beyond the BA's test cases, what regression or side-effect testing should QA do because of the impact above?
+- [ ] [specific area to re-test and what to check]
+(max 5 — focus on things that could silently break elsewhere)
+
 ## Test Cases
 - [ ] [test case]
 (max 6 test cases — focus on cases a developer might miss)

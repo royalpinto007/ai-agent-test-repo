@@ -133,6 +133,18 @@ def _parse_resolution_tier(text):
     return "code_change"
 
 
+def _detect_ui_needed(requirement):
+    """Detect the 'UI mockup needed?' answer from the issue body.
+
+    GitHub issue-form dropdowns render as a header line followed by the chosen
+    value, e.g.  '### UI mockup needed?\\n\\nYes'. Defaults to False so the UI
+    mockup (extra tokens) is only produced when explicitly requested.
+    """
+    import re
+    m = re.search(r'ui mockup needed.*?\n+\s*(yes|no)\b', requirement or "", re.IGNORECASE | re.DOTALL)
+    return bool(m and m.group(1).lower() == "yes")
+
+
 def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None, issue_type=None):
     session = load_session(session_id) or {}
     requirement = requirement or session.get("requirement", "")
@@ -140,6 +152,8 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
 
     if not requirement:
         raise ValueError("requirement is required")
+
+    ui_needed = _detect_ui_needed(requirement)
 
     # Pull latest before analysing so we read current code.
     try:
@@ -193,7 +207,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     else:
         # First pass: load files, then one combined call.
         file_contents = _load_relevant_files(requirement, file_tree_str, file_lookup)
-        combined = ask_claude(analysis_and_brd_prompt(requirement, file_tree_str, file_contents))
+        combined = ask_claude(analysis_and_brd_prompt(requirement, file_tree_str, file_contents, ui_needed=ui_needed))
         system_analysis, brd = _split_analysis_and_brd(combined)
 
     needs_clarification = _has_open_questions(brd)
@@ -210,6 +224,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "issue_type": issue_type,
         "resolution_tier": resolution_tier,
         "config_only": config_only,
+        "ui_needed": ui_needed,
         "stage": "ba",
     })
 
@@ -219,6 +234,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "needs_clarification": needs_clarification,
         "resolution_tier": resolution_tier,
         "config_only": config_only,
+        "ui_needed": ui_needed,
         "issue_type": issue_type,
         "next_stage": "ba (answer questions)" if needs_clarification else "sa",
     }

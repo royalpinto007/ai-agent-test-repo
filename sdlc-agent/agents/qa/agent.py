@@ -56,6 +56,7 @@ def run(session_id, issue_title=None, test_output=None, review_verdict=None,
     codebase_analysis = session.get("codebase_analysis", "")
     pr_description = session.get("pr_description", "")
     sdd = session.get("sdd", "")
+    brd = session.get("brd_draft", "")
 
     if not issue_title:
         raise ValueError("issue_title is required")
@@ -66,7 +67,7 @@ def run(session_id, issue_title=None, test_output=None, review_verdict=None,
     else:
         qa = ask_claude(qa_prompt(
             issue_title, test_output, review_verdict, review_dimensions,
-            impact_analysis, codebase_analysis, pr_description, sdd
+            impact_analysis, codebase_analysis, pr_description, sdd, brd
         ))
 
     approved, risk, stage_gate, prod_gate, unresolved_issues = parse_output(qa)

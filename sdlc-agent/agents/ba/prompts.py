@@ -52,14 +52,31 @@ Recommendation: Option [A/B] — [one line reason]
 """
 
 
-def analysis_and_brd_prompt(requirement, file_tree, file_contents):
-    """Single-call prompt that produces System Analysis + BRD together."""
+def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=False):
+    """Single-call prompt that produces System Analysis + BRD together.
+
+    ui_needed: when True, the BA also produces an HTML mockup of the proposed
+    UI. Gated by the issue's 'UI mockup needed?' field to control token usage.
+    """
     files_section = "\n\n".join(
         f"FILE: {path}\n```\n{content}\n```"
         for path, content in file_contents.items()
     )
     if not files_section.strip():
         files_section = "(no files were loaded — file tree may be empty or no files matched the requirement)"
+
+    ui_section = ""
+    if ui_needed:
+        ui_section = """
+### UI Mockup
+A UI change was requested for this feature. Produce a single self-contained HTML mockup of the proposed screen so the team can preview it before any code is written.
+
+- Wrap it in a fenced ```html code block.
+- Inline all CSS in a `<style>` tag — no external files, no JS frameworks, no CDN links.
+- Show the realistic layout: headings, form fields, buttons, tables, and any state the requirement implies (e.g. a validation error, an empty state).
+- Keep it to one screen. Use placeholder text/data that reflects this requirement.
+- This is a visual mockup for review, not production markup.
+"""
 
     return f"""You're a Business Analyst writing a requirement document for a development team. Output ONLY the two structured sections below — no prose, no padding.
 
@@ -129,6 +146,17 @@ Chosen tier: Config / Workaround / Code change — [one line reason that cites e
 [omit this section entirely if tier is not "Workaround"]
 [3-5 concrete steps using existing functionality — be specific about screens, fields, settings]
 
+### Test Cases
+Cover both happy path and failure modes — the cases a developer might miss.
+
+**Positive (should work):**
+- [ ] [action → expected result]
+(2-4 cases)
+
+**Negative (should be rejected / handled gracefully):**
+- [ ] [invalid input or edge case → expected handling — e.g. wrong role, empty field, cross-company access, duplicate]
+(2-4 cases)
+{ui_section}
 ### Open Questions
 - [question] — Blocking: Yes/No
 (max 3 questions — omit section if none)

@@ -1,10 +1,11 @@
 def qa_prompt(issue_title, test_output, review_verdict, review_dimensions, impact_analysis,
-              codebase_analysis="", pr_description="", sdd=""):
+              codebase_analysis="", pr_description="", sdd="", brd=""):
     dims_text = "\n".join(
         f"- **{k}:** {v['status']} — {v['notes'][:300]}"
         for k, v in (review_dimensions or {}).items()
     )
     sdd_section = f"\nSOLUTION DESIGN:\n{sdd}" if sdd else ""
+    brd_section = f"\nBUSINESS REQUIREMENTS (contains the BA Test Cases):\n{brd}" if brd else ""
     return f"""You're QA giving final sign-off. Output ONLY the structured report below — no prose, no padding.
 
 TASK: {issue_title}
@@ -13,6 +14,7 @@ PR: {pr_description or "Not provided."}
 
 IMPACT: {impact_analysis or "Not provided."}
 {sdd_section}
+{brd_section}
 
 PEER REVIEW: {review_verdict}
 {dims_text or "Not provided."}
@@ -24,6 +26,15 @@ TEST RESULTS:
 
 ## QA Summary
 **Result:** Pass / Pass with notes / Fail
+
+## Test Report
+Walk through every Test Case from the BRD (positive and negative) and every "Additional Test to Run" the SA flagged. For each, state the result based on the code in the PR and the test results above.
+
+| # | Test case (source) | Type | Expected | Result | Evidence / notes |
+|---|--------------------|------|----------|--------|------------------|
+| 1 | [case — (BA) or (SA)] | Positive/Negative | [expected behaviour] | Pass / Fail / Not verifiable | [what in the diff or test output supports this — or why it needs a running instance] |
+
+Be honest in **Result**: mark "Pass" only when the code clearly implements it. Use "Not verifiable" when confirming would need a running IOMAD instance or manual click-through, and say what a human should check.
 
 ## Test Coverage
 | Area | Tested | Result |
