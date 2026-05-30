@@ -1,0 +1,14 @@
+[Unit]
+Description=IOMAD Behat test-runner API (port 8090)
+After=network.target selenium.service behat-webserver.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/test-runner
+ExecStart=/usr/bin/python3 /opt/test-runner/run_tests_service.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
