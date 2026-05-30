@@ -184,6 +184,22 @@ All 30 Thrive-ERP code repos are cloned to `/opt/repos/` on the server and regis
 
 ---
 
+## Deployments / box map
+
+Two independent deployments share one n8n instance (path-routed webhooks):
+
+| | Thrive-ERP | acornsafety / IOMAD |
+|---|---|---|
+| Agent box (sdlc-api :5001) | `10.68.103.135` | **`10.68.103.242`** (host `IOMAD`) |
+| n8n | `agent-workflow.accellier.net` | **`10.68.103.138:5678`** |
+| Live app + Behat test-runner | — | **`10.68.103.136`** (host `IOMAD-LIVE`, runner :8090) |
+| Requirements repo | `Thrive-ERP/thrive-requirements` | `Health-and-Safety-Solution/acornsafety_requirement` |
+| Claude model | default | pinned **Haiku** |
+
+These boxes sit on a private `10.68.x` network: they reach each other and the public GitHub API, but are **not reachable from a workstation/laptop** — run diagnostics from the boxes themselves (or via the GitHub API). On the agent box the repo is checked out at `/opt/sdlc-agent` (code under `/opt/sdlc-agent/sdlc-agent/`). acornsafety approval workflow id: `QOHRTVRP8qWrVYQ0`.
+
+---
+
 ## Project structure
 
 ```
@@ -309,6 +325,21 @@ curl -X POST http://localhost:5001/ba-agent \
 **PR creation fails**
 - `GITHUB_TOKEN` needs `repo` scope with write access to the target repo
 - Retry without re-running dev: `curl -X POST http://localhost:5001/create-pr -H "Content-Type: application/json" -d '{"session_id":"owner-repo-42"}'`
+- **404 Not Found** on PR creation: was a repo-name bug — `rstrip(".git")` mangled repo names ending in `t/g/i/.` (e.g. `acornsafety_requirement` → `…requiremen`). Fixed with `removesuffix(".git")` in `shared/utils.py`. If you see it again, check the derived owner/repo.
+- **422 "No commits between main and <branch>"**: the dev model produced no parseable `FILE:` blocks (smaller models like Haiku sometimes reply with exploratory prose instead), so the branch is empty. The dev agent now retries with a pointed nudge and, if still empty, fails the stage cleanly ("no parseable files… use `redo-dev`") rather than pushing an empty branch. Inspect `dev_raw_output` in the session to confirm.
+
+**A stage is stuck on "… Working" forever (chain stalled)**
+- A `claude` process alive + a "sleeping Ns" log line = a rate-limit auto-retry sleeping until the reset window; it resumes on its own.
+- No `claude` process and no progress = the n8n execution died. Find it via the n8n API (n8n runs on its own host, not the agent box):
+  `curl -s -H "X-N8N-API-KEY: <key>" "http://<n8n-host>:5678/api/v1/executions?workflowId=<wf2-id>&limit=15"` → look for the `error`/`running` one, then `GET /executions/<id>?includeData=true` and read `resultData.lastNodeExecuted` + `error.message`.
+- **Recovery:** roll the GitHub milestone back one step (e.g. PATCH the issue to the `Planning Awaiting Approval` milestone) and re-post `approve` — n8n re-fires that stage from the matching node.
+- Note: editing a workflow via the n8n API **deactivates** it — POST `/workflows/<id>/activate` afterwards.
+
+**Restarting `sdlc-api` kills an in-flight agent**
+- A `systemctl restart` mid-run aborts the running agent (e.g. leaves it on `BRD Working` with no comment). Re-trigger BA by unassigning then re-assigning `agent-accellier` (the `assigned` webhook is what fires workflow 1).
+
+**Test Evidence screenshots don't render in the comment**
+- GitHub's image (camo) proxy fetches source URLs anonymously, so `raw.githubusercontent.com` links to a **private** repo 404 and won't render inline. Either make the repo public, or have the Test Evidence step upload to a separate **public** evidence repo. Committing screenshots into a private repo can never render inline — it's a GitHub limitation, not a pipeline bug.
 
 **Sessions directory fills up**
 - Safe to delete: `find /opt/sdlc-agent/sdlc-agent/sessions -name "*.json" -mtime +30 -delete`
