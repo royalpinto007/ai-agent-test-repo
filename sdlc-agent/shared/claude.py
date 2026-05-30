@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import subprocess
 import time
@@ -8,6 +9,18 @@ log = logging.getLogger(__name__)
 
 RESET_BUFFER_SECONDS = 30
 MAX_RETRIES = 1
+
+# Optional model override. Set CLAUDE_MODEL in the environment (e.g. in
+# /etc/sdlc-agent/env) to pin a specific model — e.g. "haiku" for a lighter,
+# cheaper pipeline. If unset, the claude CLI uses the account default.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "").strip()
+
+
+def _claude_cmd():
+    cmd = ["claude", "-p", "--tools", ""]
+    if CLAUDE_MODEL:
+        cmd += ["--model", CLAUDE_MODEL]
+    return cmd
 
 _TOOL_CALL_BLOCK = re.compile(
     r"<function_calls>.*?</function_calls>\s*",
@@ -53,7 +66,7 @@ def ask_claude(prompt):
     attempts = 0
     while True:
         result = subprocess.run(
-            ["claude", "-p", "--tools", ""],
+            _claude_cmd(),
             input=prompt,
             capture_output=True,
             text=True,
