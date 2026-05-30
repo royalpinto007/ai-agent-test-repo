@@ -37,7 +37,9 @@ def implementation_prompt(issue_title, issue_description, file_contents, affecte
     affected_section = "\n".join(f"- {f}" for f in affected_files) if affected_files else "None identified"
     pm_section = f"\nTASK DETAILS FROM PM:\n{pm_tasks}" if pm_tasks else ""
 
-    return f"""Implement the task. Match the existing code style exactly.
+    return f"""CONSTRAINT: You have no tool access — no shell, no network, no file reads. Everything you need (file tree and current file contents) is already in this prompt. This is a SINGLE-SHOT request: you will NOT get another turn, so do not say "let me check" or "reading the files" or emit exploratory shell commands — there is nobody to run them. Do NOT emit `<function_calls>` or any tool-invocation XML. Produce the COMPLETE implementation right now, as actual file contents in the `## Changes` / `FILE:` format specified below. If something is genuinely missing, make a reasonable assumption, note it in ## Summary, and still output the files.
+
+Implement the task. Match the existing code style exactly.
 
 TASK: {issue_title}
 {issue_description}

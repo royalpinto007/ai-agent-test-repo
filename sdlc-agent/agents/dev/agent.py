@@ -150,12 +150,47 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         test_passed, test_output = run_tests(repo_path, test_command)
         attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output})
 
-        if test_passed:
+        # A "passing" run with zero parsed files is not success — the model
+        # returned prose/exploration instead of FILE: blocks (common on smaller
+        # models). Don't accept it; retry with a pointed nudge.
+        if test_passed and (changes or tests):
             break
         if attempt < MAX_RETRIES:
-            output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
+            if not changes and not tests:
+                nudge = ("Your previous response contained NO `FILE:` blocks — you output no "
+                         "implementation files at all (only prose/exploration). You have no tools "
+                         "and get no further turns. Output the COMPLETE file contents now using the "
+                         "`## Changes` / `FILE:` format.")
+                output = ask_claude(retry_prompt(issue_title, output, nudge, attempt, codebase_analysis))
+            else:
+                output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
 
     final = attempts[-1]
+
+    # If the model never produced any files, don't push an empty branch (which
+    # yields a 422 "No commits between main and <branch>" on PR creation).
+    # Surface it as a dev failure so the pipeline flags it for a redo.
+    if not changes and not tests:
+        save_session(session_id, {
+            "stage": "dev",
+            "repo_path": repo_path,
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "codebase_analysis": codebase_analysis,
+            "dev_raw_output": output,
+            "test_passed": False,
+            "files_changed": [],
+            "attempts": len(attempts),
+        })
+        return {
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "test_passed": False,
+            "files_changed": [],
+            "attempts": len(attempts),
+            "error": "Dev produced no parseable files after all attempts (model returned prose/exploration instead of `FILE:` blocks). Re-run dev or use `redo-dev: <instructions>`.",
+            "next_stage": "dev (no files generated)",
+        }
 
     if not final["test_passed"]:
         save_session(session_id, {
