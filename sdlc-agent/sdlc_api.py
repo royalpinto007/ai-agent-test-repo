@@ -492,5 +492,91 @@ def set_milestone_endpoint():
     return jsonify({"status": "success" if ok else "error", "milestone": milestone_title})
 
 
+def _behat_gen_prompt(title, brd):
+    return f"""Generate a Moodle Behat feature (Gherkin) that smoke-tests this requirement on a FRESH IOMAD test site and captures screenshots as evidence.
+
+REQUIREMENT: {title}
+
+CONTEXT (BRD excerpt):
+{(brd or '')[:2000]}
+
+STRICT RULES:
+- Output ONLY Gherkin, starting with `Feature:`. No prose, no code fences, no @tags (tags are added automatically).
+- The test site is EMPTY — no courses, users, or companies exist. Only the `admin` user exists. Do NOT reference data that wouldn't be there.
+- Use ONLY these steps (exact wording):
+  - Given I log in as "admin"
+  - And I am on site homepage
+  - And I navigate to "<Page> > <Subpage>" in site administration
+  - And I capture the screen as "<short-name>"
+  - Then I should see "<text>"
+  - And I click on "<text>" "link"
+  - And I press "<button>"
+- ONE Scenario, 4-8 steps. Navigate to the admin page most relevant to the requirement and `capture the screen` after each navigation.
+- Every scenario must include at least two `I capture the screen as` steps."""
+
+
+@app.route("/test-evidence", methods=["POST"])
+def test_evidence():
+    """Run a Behat feature on the live IOMAD test instance, upload the
+    screenshots to the repo, and comment them on the issue. Generates a
+    constrained smoke feature from the BRD if none is supplied."""
+    data = request.json or {}
+    sid = _sid(data)
+    session = load_session(sid) or {}
+    owner = data.get("owner") or session.get("owner", "")
+    repo = data.get("repo") or session.get("repo", "")
+    issue_number = data.get("issue_number") or session.get("issue_number")
+    token = os.environ.get("GITHUB_TOKEN", "")
+
+    from shared.test_runner_client import run_behat_feature, runner_available
+    if not runner_available():
+        return jsonify({"status": "error", "message": "test runner unavailable (check TEST_RUNNER_URL / IOMAD-LIVE)"}), 503
+
+    feature = data.get("feature") or session.get("test_feature")
+    if not feature:
+        from shared.claude import ask_claude
+        title = session.get("issue_title") or (session.get("requirement", "").split("\n")[0].strip()) or "the feature"
+        feature = ask_claude(_behat_gen_prompt(title, session.get("brd_draft", "")))
+
+    result = run_behat_feature(feature, name=f"issue-{issue_number or 'adhoc'}")
+    if result.get("error"):
+        return jsonify({"status": "error", "message": result["error"], "output_tail": result.get("output_tail", "")}), 502
+
+    import base64 as _b64
+    from shared.utils import upload_file_to_github, post_github_comment
+    links = []
+    for s in result.get("screenshots", []):
+        try:
+            png = _b64.b64decode(s["b64"])
+            path = f"test-evidence/issue-{issue_number}/{s['name']}"
+            url = upload_file_to_github(owner, repo, token, path, png, f"test evidence for #{issue_number}")
+            if url:
+                links.append((s["name"], url))
+        except Exception:
+            pass
+
+    status = "PASS" if result.get("passed") else "needs review"
+    body = f"## Test Evidence — live IOMAD run\n\n**Result:** {status} — {result.get('summary', '')}\n\n"
+    if links:
+        for name_, url in links:
+            body += f"**{name_}**\n\n![{name_}]({url})\n\n"
+    else:
+        body += "_No screenshots captured (see run output)._\n"
+    if token and owner and repo and issue_number:
+        post_github_comment(owner, repo, issue_number, body, token)
+
+    save_session(sid, {"test_evidence": {
+        "passed": result.get("passed"),
+        "summary": result.get("summary"),
+        "screenshot_urls": [u for _, u in links],
+    }})
+    return jsonify({
+        "status": "success",
+        "passed": result.get("passed"),
+        "summary": result.get("summary"),
+        "screenshots": [u for _, u in links],
+    })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)

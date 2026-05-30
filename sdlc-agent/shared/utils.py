@@ -276,6 +276,41 @@ def create_github_issue(owner, repo, token, title, body, labels=None, assignees=
         raise RuntimeError(f"GitHub API error {e.code}: {e.read().decode()}")
 
 
+def upload_file_to_github(owner, repo, token, path, content_bytes, message, branch="main"):
+    """Commit a binary file to a repo via the Contents API. Returns the raw URL
+    (usable in markdown image embeds) or None on error. Updates if it exists."""
+    import urllib.request
+    import urllib.error
+    import base64 as _b64
+
+    api = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+    }
+    # if the file already exists we need its sha to update it
+    sha = None
+    try:
+        getreq = urllib.request.Request(f"{api}?ref={branch}", headers=headers)
+        with urllib.request.urlopen(getreq) as resp:
+            sha = json.loads(resp.read()).get("sha")
+    except Exception:
+        pass
+
+    payload = {"message": message, "content": _b64.b64encode(content_bytes).decode(), "branch": branch}
+    if sha:
+        payload["sha"] = sha
+    req = urllib.request.Request(api, data=json.dumps(payload).encode(), headers=headers, method="PUT")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read())
+            return data.get("content", {}).get("download_url")
+    except urllib.error.HTTPError as e:
+        log_err = e.read().decode()[:200]
+        raise RuntimeError(f"GitHub upload error {e.code}: {log_err}")
+
+
 def post_github_comment(owner, repo, issue_number, body, token):
     """Post a comment on a GitHub issue. Returns the comment URL or None on error."""
     import urllib.request
