@@ -88,12 +88,15 @@ def run_tests():
         return jsonify({"error": "another test run is in progress, retry shortly"}), 409
 
     try:
-        tag = f"run_{name}_{int(time.time())}"
-        # drop any leading tag lines the caller included; inject our own
+        run_id = f"{name}_{int(time.time())}"
+        # drop any leading tag lines the caller included; we use the stable
+        # component tag (proof.feature is the only feature carrying it, and the
+        # lock serialises runs, so a per-run tag isn't needed — and dynamic tags
+        # were found not to match reliably).
         lines = feature.splitlines()
         while lines and lines[0].lstrip().startswith("@"):
             lines.pop(0)
-        full = f"@local @local_pipelinetest @javascript @{tag}\n" + "\n".join(lines).rstrip() + "\n"
+        full = "@local @local_pipelinetest @javascript\n" + "\n".join(lines).rstrip() + "\n"
 
         # overwrite the registered feature file (its path is in behat.yml)
         with open(REGISTERED_FEATURE, "w") as fh:
@@ -109,7 +112,7 @@ def run_tests():
         start = time.time()
         try:
             proc = subprocess.run(
-                [PHP, "vendor/bin/behat", "--config", BEHAT_CONFIG, "--tags", f"@{tag}"],
+                [PHP, "vendor/bin/behat", "--config", BEHAT_CONFIG, "--tags", "@local_pipelinetest"],
                 cwd=IOMAD_DIR, capture_output=True, text=True, timeout=RUN_TIMEOUT,
             )
             out = (proc.stdout or "") + "\n" + (proc.stderr or "")
@@ -123,7 +126,7 @@ def run_tests():
         summary = m.group(0) if m else "no scenario summary found (likely an error before run)"
 
         return jsonify({
-            "tag": tag,
+            "run_id": run_id,
             "passed": passed,
             "summary": summary,
             "screenshots": _collect_pngs(start),
