@@ -50,7 +50,7 @@ mysql --version
 ```bash
 mysql <<'SQL'
 CREATE DATABASE iomad DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'iomaduser'@'localhost' IDENTIFIED BY 'Iomad_Local_DB_9x72';
+CREATE USER 'iomaduser'@'localhost' IDENTIFIED BY '<DB_PASSWORD>';
 GRANT ALL PRIVILEGES ON iomad.* TO 'iomaduser'@'localhost';
 FLUSH PRIVILEGES;
 SQL
@@ -134,9 +134,9 @@ sudo -u www-data php8.2 /var/www/html/iomad/admin/cli/install.php \
   --wwwroot=http://10.68.103.136 \
   --dataroot=/var/moodledata \
   --dbtype=mariadb --dbhost=localhost --dbname=iomad \
-  --dbuser=iomaduser --dbpass='Iomad_Local_DB_9x72' \
+  --dbuser=iomaduser --dbpass='<DB_PASSWORD>' \
   --fullname="Acorn IOMAD Test" --shortname="iomad-test" \
-  --adminuser=admin --adminpass='AdminPass#2026' --adminemail=admin@example.com \
+  --adminuser=admin --adminpass='<ADMIN_PASSWORD>' --adminemail=admin@example.com \
   --non-interactive --agree-license
 ```
 This writes `config.php`. If it complains `config.php already exists`, that's fine — proceed to Step 7 (it just means the file part is done).
@@ -147,7 +147,7 @@ This writes `config.php`. If it complains `config.php already exists`, that's fi
 
 ```bash
 sudo -u www-data php8.2 /var/www/html/iomad/admin/cli/install_database.php \
-  --lang=en --adminuser=admin --adminpass='AdminPass#2026' \
+  --lang=en --adminuser=admin --adminpass='<ADMIN_PASSWORD>' \
   --adminemail=admin@example.com --fullname="Acorn IOMAD Test" \
   --shortname="iomad-test" --agree-license
 ```
@@ -170,7 +170,7 @@ sudo -u www-data php8.2 /var/www/html/iomad/admin/cli/install_database.php \
 >
 > Move pattern: `mkdir -p /root/iomad-disabled/<dir> && mv /var/www/html/iomad/<path> /root/iomad-disabled/<path>`. These are real upstream defects — flag to the IOMAD maintainers.
 
-Success = `Installation completed successfully.` The site is then live at `http://10.68.103.136` (admin / `AdminPass#2026`).
+Success = `Installation completed successfully.` The site is then live at `http://10.68.103.136` (admin / `<ADMIN_PASSWORD>`).
 
 ---
 
@@ -367,7 +367,7 @@ Run any feature by tag (`--tags=@x`), scenario name (`--name="..."`), or path.
 
 ## Reference
 
-- **Admin:** `admin` / `AdminPass#2026` at `http://10.68.103.136`
+- **Admin:** `admin` / `<ADMIN_PASSWORD>` at `http://10.68.103.136`
 - **DB:** `iomad` / `iomaduser` / (password set in Step 2) — local only
 - **Disabled plugins:** `/root/iomad-disabled/` + `STRIPPED.txt` (4 entries — see Step 7)
 - **Behat config:** `/var/behatdata/behatrun/behat/behat.yml`

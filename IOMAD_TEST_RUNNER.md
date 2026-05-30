@@ -14,7 +14,7 @@ Status: **infrastructure proven and working.** Pipeline wiring is the remaining 
 | Stack | Ubuntu 24.04, PHP 8.2, MariaDB 10.11, Apache |
 | App | IOMAD (Moodle 4.3.12, branch `acorn_iomad_403`) at `http://10.68.103.136` |
 | DB | `iomad` / user `iomaduser` (local-only) |
-| Admin login | `admin` / `AdminPass#2026` |
+| Admin login | `admin` / `<ADMIN_PASSWORD>` |
 | moodledata | `/var/moodledata` |
 | Code | `/var/www/html/iomad` (cloned from `Health-and-Safety-Solution/iomad` + 19 plugin submodules) |
 
