@@ -138,7 +138,10 @@ def create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_de
     ).stdout.strip()
     # Handle both https://github.com/owner/repo.git and git@github.com:owner/repo.git
     remote = remote.replace("git@github.com:", "https://github.com/")
-    parts = remote.rstrip(".git").rstrip("/").split("/")
+    # NB: use removesuffix, not rstrip(".git") — rstrip strips any trailing
+    # chars in the set {. g i t}, mangling repo names ending in those letters
+    # (e.g. "acornsafety_requirement" -> "...requiremen" -> 404 on the PR call).
+    parts = remote.removesuffix(".git").rstrip("/").split("/")
     owner, repo = parts[-2], parts[-1]
 
     body = pr_description or summary or ""
@@ -185,7 +188,7 @@ def check_pr_file_overlap(repo_path, current_branch, token):
         ["git", "remote", "get-url", "origin"],
         cwd=repo_path, capture_output=True, text=True
     ).stdout.strip().replace("git@github.com:", "https://github.com/")
-    parts = remote.rstrip(".git").rstrip("/").split("/")
+    parts = remote.removesuffix(".git").rstrip("/").split("/")
     owner, repo = parts[-2], parts[-1]
 
     # Files changed in the current branch vs main

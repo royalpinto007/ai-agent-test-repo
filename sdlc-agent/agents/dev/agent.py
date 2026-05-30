@@ -11,8 +11,13 @@ def parse_output(output):
     changes = {}
     tests = {}
     for path, content in re.findall(r'FILE:\s*(.+?)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL):
-        path = path.strip()
+        # Models often wrap the filename in inline-code backticks, quotes, or
+        # markdown emphasis (e.g. FILE: `local_iomad/version.php`); strip those
+        # so we don't create junk paths like "`local_iomad/...".
+        path = path.strip().strip('`*\'" ').strip()
         content = content.strip()
+        if not path:
+            continue
         if "test" in path.lower() or "spec" in path.lower():
             tests[path] = content
         else:
@@ -183,8 +188,16 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         ["git", "commit", "-m", f"feat: {issue_title} (attempts: {len(attempts)}, tests: {'pass' if final['test_passed'] else 'fail'})"],
         cwd=repo_path, capture_output=True, text=True
     )
-    if commit_result.returncode != 0 and "nothing to commit" not in commit_result.stdout + commit_result.stderr:
-        raise RuntimeError(f"git commit -m feat: {issue_title} failed: {commit_result.stderr.strip()}")
+    _commit_out = commit_result.stdout + commit_result.stderr
+    # git reports an empty commit several ways depending on staging state;
+    # treat all of them as a benign no-op rather than crashing the stage.
+    _benign_commit = (
+        "nothing to commit",
+        "no changes added to commit",
+        "nothing added to commit",
+    )
+    if commit_result.returncode != 0 and not any(b in _commit_out for b in _benign_commit):
+        raise RuntimeError(f"git commit failed: {_commit_out.strip()}")
     run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
 
     issue_number = session_id.split("-")[-1] if "-" in session_id else None
