@@ -32,6 +32,20 @@ FAILDUMP_DIR = "/var/behatdata/faildumps"
 PHP          = "/usr/bin/php8.2"
 RUN_TIMEOUT  = 900  # seconds
 
+# Moodle's behat.yml enumerates specific feature FILES at init time, not dirs,
+# so a brand-new .feature is NOT discovered without a slow re-init. Instead we
+# overwrite this already-registered file with each run's content (behat reads
+# file contents at run time) and restore the default afterwards.
+REGISTERED_FEATURE = f"{BEHAT_DIR}/proof.feature"
+DEFAULT_PROOF = (
+    "@local @local_pipelinetest @javascript\n"
+    "Feature: Pipeline screenshot proof\n"
+    "  Scenario: Capture the IOMAD front page\n"
+    "    Given I am on site homepage\n"
+    '    Then I should see "Acceptance test site"\n'
+    '    And I capture the screen as "homepage"\n'
+)
+
 _lock = threading.Lock()
 
 
@@ -73,22 +87,17 @@ def run_tests():
     if not _lock.acquire(blocking=False):
         return jsonify({"error": "another test run is in progress, retry shortly"}), 409
 
-    feat_path = None
     try:
         tag = f"run_{name}_{int(time.time())}"
         # drop any leading tag lines the caller included; inject our own
         lines = feature.splitlines()
         while lines and lines[0].lstrip().startswith("@"):
             lines.pop(0)
-        full = f"@javascript @{tag}\n" + "\n".join(lines).rstrip() + "\n"
+        full = f"@local @local_pipelinetest @javascript @{tag}\n" + "\n".join(lines).rstrip() + "\n"
 
-        feat_path = f"{BEHAT_DIR}/{tag}.feature"
-        with open(feat_path, "w") as fh:
+        # overwrite the registered feature file (its path is in behat.yml)
+        with open(REGISTERED_FEATURE, "w") as fh:
             fh.write(full)
-        try:
-            os.chmod(feat_path, 0o666)
-        except OSError:
-            pass
 
         # clear prior on-demand shots so we return only this run's captures
         for p in glob.glob(f"{SHOTS_DIR}/*.png"):
@@ -121,11 +130,12 @@ def run_tests():
             "output_tail": out[-3000:],
         })
     finally:
-        if feat_path and os.path.exists(feat_path):
-            try:
-                os.remove(feat_path)
-            except OSError:
-                pass
+        # restore the registered feature to a known-good default
+        try:
+            with open(REGISTERED_FEATURE, "w") as fh:
+                fh.write(DEFAULT_PROOF)
+        except OSError:
+            pass
         _lock.release()
 
 
