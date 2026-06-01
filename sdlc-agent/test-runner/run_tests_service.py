@@ -16,11 +16,12 @@ import base64
 import glob
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
@@ -31,6 +32,13 @@ SHOTS_DIR    = "/var/behatdata/shots"
 FAILDUMP_DIR = "/var/behatdata/faildumps"
 PHP          = "/usr/bin/php8.2"
 RUN_TIMEOUT  = 900  # seconds
+
+# Screenshots are kept here per-run and served over HTTP so they can be linked
+# (not uploaded to GitHub). The links are click-to-open from a browser that can
+# reach this box — keep it internal/VPN-only to stay private. EVIDENCE_BASE_URL
+# is whatever address your team uses to reach this service.
+EVIDENCE_DIR      = "/var/behatdata/evidence"
+EVIDENCE_BASE_URL = os.environ.get("EVIDENCE_BASE_URL", "http://10.68.103.136:8090").rstrip("/")
 
 # Moodle's behat.yml enumerates specific feature FILES at init time, not dirs,
 # so a brand-new .feature is NOT discovered without a slow re-init. Instead we
@@ -49,19 +57,27 @@ DEFAULT_PROOF = (
 _lock = threading.Lock()
 
 
-def _collect_pngs(since_ts):
-    """Base64 every PNG created at/after since_ts, from shots + faildumps."""
+def _collect_pngs(since_ts, run_id):
+    """For every PNG created at/after since_ts (shots + faildumps): copy it into
+    a persistent per-run evidence dir and return a self-hosted URL per shot
+    (plus base64, kept for callers that still want the bytes)."""
     paths = sorted(glob.glob(f"{SHOTS_DIR}/*.png")) + \
             sorted(glob.glob(f"{FAILDUMP_DIR}/**/*.png", recursive=True))
+    run_dir = os.path.join(EVIDENCE_DIR, run_id)
     shots = []
     for path in paths:
         try:
             if os.path.getmtime(path) >= since_ts - 1:
+                base = os.path.basename(path)
+                safe = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+                os.makedirs(run_dir, exist_ok=True)
+                shutil.copy2(path, os.path.join(run_dir, safe))
                 with open(path, "rb") as fh:
                     shots.append({
-                        "name": os.path.basename(path),
+                        "name": base,
                         "kind": "ondemand" if SHOTS_DIR in path else "failure",
                         "b64": base64.b64encode(fh.read()).decode(),
+                        "url": f"{EVIDENCE_BASE_URL}/evidence/{run_id}/{safe}",
                     })
         except OSError:
             pass
@@ -71,6 +87,13 @@ def _collect_pngs(since_ts):
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "busy": _lock.locked()})
+
+
+@app.route("/evidence/<run_id>/<path:filename>")
+def evidence(run_id, filename):
+    """Serve a stored screenshot. send_from_directory guards against traversal."""
+    safe_run = re.sub(r"[^A-Za-z0-9._-]", "_", run_id)
+    return send_from_directory(os.path.join(EVIDENCE_DIR, safe_run), filename)
 
 
 @app.route("/run-tests", methods=["POST"])
@@ -129,7 +152,7 @@ def run_tests():
             "run_id": run_id,
             "passed": passed,
             "summary": summary,
-            "screenshots": _collect_pngs(start),
+            "screenshots": _collect_pngs(start, run_id),
             "output_tail": out[-3000:],
         })
     finally:

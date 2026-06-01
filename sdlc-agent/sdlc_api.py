@@ -555,27 +555,25 @@ def test_evidence():
     if result.get("error"):
         return jsonify({"status": "error", "message": result["error"], "output_tail": result.get("output_tail", "")}), 502
 
-    import base64 as _b64
-    from shared.utils import upload_file_to_github, post_github_comment
+    # Screenshots are self-hosted on the test instance (not uploaded to GitHub);
+    # the runner returns a click-to-open URL per shot. Keeping them off GitHub
+    # keeps the repo private — the links open from a browser that can reach the
+    # test box (internal/VPN).
+    from shared.utils import post_github_comment
     links = []
     for s in result.get("screenshots", []):
-        try:
-            png = _b64.b64decode(s["b64"])
-            path = f"test-evidence/issue-{issue_number}/{s['name']}"
-            uploaded = upload_file_to_github(owner, repo, token, path, png, f"test evidence for #{issue_number}")
-            if uploaded:
-                # clean public raw URL (no expiring token) — renders inline in comments
-                clean_url = f"https://raw.githubusercontent.com/{owner}/{repo}/main/{path}"
-                links.append((s["name"], clean_url))
-        except Exception:
-            pass
+        url = s.get("url")
+        if url:
+            links.append((s.get("name", "screenshot"), url))
 
     status = "PASS" if result.get("passed") else "needs review"
     body = f"## Test Evidence — live IOMAD run\n\n**Result:** {status} — {result.get('summary', '')}\n\n"
     if links:
-        body += f"**Screenshots:** {len(links)} (one per test case, where reachable)\n\n"
+        body += (f"**Screenshots:** {len(links)} (one per test case, where reachable) — "
+                 f"hosted on the IOMAD test instance; click to view (internal/VPN access).\n\n")
         for name_, url in links:
-            body += f"**{name_}**\n\n![{name_}]({url})\n\n"
+            body += f"- [{name_}]({url})\n"
+        body += "\n"
     else:
         body += "_No screenshots captured (see run output)._\n"
     if token and owner and repo and issue_number:
