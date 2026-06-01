@@ -30,20 +30,19 @@ print '<div class="ebr-body">';
 if (!$rs || $db->num_rows($rs) === 0) {
     print '<div class="ebr-empty">No payouts settled yet. Reconcile a payout and click <strong>Pay all</strong> — it will show up here.</div>';
 } else {
-    print '<div class="ebr-tablewrap">';
     print '<table class="liste ebr-table ebr-history-table">';
     // Explicit column widths so the table doesn't sprawl into empty
     // whitespace and numeric cells stay visually next to their headers.
     print '<colgroup>';
-    print '<col style="width:130px"/>'; // Payout ID
-    print '<col style="width:100px"/>'; // Payout date
-    print '<col />';                     // Method (flex)
-    print '<col style="width:70px"/>';  // Orders
-    print '<col style="width:80px"/>';  // Payments
-    print '<col style="width:90px"/>';  // Total paid
-    print '<col style="width:140px"/>'; // Settled at
-    print '<col style="width:120px"/>'; // By
-    print '<col style="width:70px"/>';  // details link
+    print '<col style="width:170px"/>'; // Payout ID
+    print '<col style="width:130px"/>'; // Payout date
+    print '<col style="width:180px"/>'; // Method
+    print '<col style="width:80px"/>';  // Orders
+    print '<col style="width:90px"/>';  // Payments
+    print '<col style="width:110px"/>'; // Total paid
+    print '<col style="width:165px"/>'; // Settled at
+    print '<col style="width:150px"/>'; // By
+    print '<col style="width:80px"/>';  // details link
     print '</colgroup>';
     print '<thead><tr class="liste_titre">';
     print '<th>Payout ID</th><th>Payout date</th><th>Method</th>';
@@ -82,7 +81,14 @@ if (!$rs || $db->num_rows($rs) === 0) {
         if (empty($items)) {
             print '<em>No per-payment data recorded for this entry.</em>';
         } else {
-            print '<table>';
+            print '<table class="ebr-history-detail-table">';
+            print '<colgroup>';
+            print '<col style="width:170px"/>'; // Order number
+            print '<col style="width:140px"/>'; // SO ref
+            print '<col style="width:180px"/>'; // Invoice
+            print '<col style="width:100px"/>'; // Amount
+            print '<col style="width:110px"/>'; // Payment ID
+            print '</colgroup>';
             print '<thead><tr>';
             print '<th>Order number</th>';
             print '<th>SO ref</th>';
@@ -114,7 +120,7 @@ if (!$rs || $db->num_rows($rs) === 0) {
         print '</div></td></tr>';
         $idx++;
     }
-    print '</tbody></table></div>';
+    print '</tbody></table>';
 
     print '<script>
     document.querySelectorAll("a.ebr-toggle").forEach(a => {

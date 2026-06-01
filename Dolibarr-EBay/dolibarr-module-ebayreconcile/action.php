@@ -42,6 +42,7 @@ try {
         case 'create_invoice':  echo json_encode(doCreateInvoice($body, $resultByOrder)); exit;
         case 'pay':             echo json_encode(doPay($body, $resultByOrder)); exit;
         case 'save_payout':     echo json_encode(doSavePayout($body)); exit;
+        case 'save_note':       echo json_encode(doSaveNote($body)); exit;
         default:
             jsonError("Unknown action: ".$action);
     }
@@ -73,6 +74,7 @@ function doApprove($body, $resultByOrder)
     $parentInvoiceId = isset($body['parentInvoiceId']) ? (int) $body['parentInvoiceId'] : 0;
     $amount          = isset($body['amount']) ? (float) $body['amount'] : 0.0;
     $kind            = isset($body['action']) ? $body['action'] : 'credit_note';
+    $userNote        = isset($body['note']) ? trim((string) $body['note']) : '';
     if (!$orderNumber)     throw new Exception('orderNumber is required');
     if (!$parentInvoiceId) throw new Exception('parentInvoiceId is required');
     if ($amount <= 0)      throw new Exception('amount must be positive');
@@ -88,6 +90,7 @@ function doApprove($body, $resultByOrder)
     $cn->ref_client         = $orderNumber;
     $cn->date               = dol_now();
     $cn->note_private       = "Auto-created via eBay reconciliation. eBay order: $orderNumber. Source invoice: ".$parent->ref." (id $parentInvoiceId).";
+    if ($userNote !== '') $cn->note_private .= "\nUser note: ".$userNote;
     if ($kind === 'credit_note') $cn->fk_facture_source = $parentInvoiceId;
 
     $cn->lines = array();
@@ -142,6 +145,7 @@ function doCreateInvoice($body, $resultByOrder)
     $orderNumber = isset($body['orderNumber']) ? $body['orderNumber'] : '';
     $parentSoId  = isset($body['parentSoId']) ? (int) $body['parentSoId'] : 0;
     $lines       = isset($body['lines']) ? $body['lines'] : array();
+    $userNote    = isset($body['note']) ? trim((string) $body['note']) : '';
     if (!$orderNumber) throw new Exception('orderNumber is required');
     if (empty($lines) || !is_array($lines)) {
         // Fallback: pull from session lastRun
@@ -171,6 +175,7 @@ function doCreateInvoice($body, $resultByOrder)
     $inv->ref_client      = $orderNumber;
     $inv->date            = dol_now();
     $inv->note_private    = "Auto-created via eBay reconciliation. eBay order: $orderNumber.".($parentSoRef ? " Linked to SO $parentSoRef (id $parentSoId)." : ' No SO existed; using default eBay customer.');
+    if ($userNote !== '') $inv->note_private .= "\nUser note: ".$userNote;
     if ($parentSoId > 0) {
         $inv->origin       = 'commande';
         $inv->origin_id    = $parentSoId;
@@ -216,6 +221,7 @@ function doPay($body, $resultByOrder)
     $payoutDateUnix = isset($body['payoutDateUnix']) ? (int) $body['payoutDateUnix'] : 0;
     $paymentTypeId  = isset($body['paymentTypeId']) ? (int) $body['paymentTypeId'] : (int) $conf->global->EBAYRECONCILE_PAYMENT_TYPE_ID;
     $bankAccountId  = isset($body['bankAccountId']) ? (int) $body['bankAccountId'] : (int) $conf->global->EBAYRECONCILE_BANK_ACCOUNT_ID;
+    $userNote       = isset($body['note']) ? trim((string) $body['note']) : '';
 
     if (!$orderNumber) throw new Exception('orderNumber is required');
     if (!$payoutId) throw new Exception('payoutId is required');
@@ -258,6 +264,7 @@ function doPay($body, $resultByOrder)
         $p->paiementid  = $paymentTypeId;
         $p->num_payment = $payoutId;
         $p->note_private= "eBay payout $payoutId - order $orderNumber (invoice ".$f->ref.")";
+        if ($userNote !== '') $p->note_private .= "\nUser note: ".$userNote;
         $p->amounts     = array($f->id => $remain);
         $paymentId = $p->create($user, 1); // 1 = closepaidinvoices yes
         if ($paymentId <= 0) {
@@ -336,6 +343,25 @@ function doSavePayout($body)
     return array('ok' => true, 'id' => $db->last_insert_id(MAIN_DB_PREFIX.'ebayreconcile_payout'));
 }
 
+function doSaveNote($body)
+{
+    $orderNumber = isset($body['orderNumber']) ? trim((string) $body['orderNumber']) : '';
+    $note = isset($body['note']) ? trim((string) $body['note']) : '';
+    if ($orderNumber === '') throw new Exception('orderNumber is required');
+    if (empty($_SESSION['ebayreconcile_lastrun']['results']) || !is_array($_SESSION['ebayreconcile_lastrun']['results'])) {
+        throw new Exception('No reconcile session found');
+    }
+
+    foreach ($_SESSION['ebayreconcile_lastrun']['results'] as &$row) {
+        if (!isset($row['order_number']) || $row['order_number'] !== $orderNumber) continue;
+        $row['notes'] = $note;
+        return array('ok' => true, 'orderNumber' => $orderNumber, 'note' => $note);
+    }
+    unset($row);
+
+    throw new Exception('Order not found in last reconcile session');
+}
+
 /**
  * Build a FactureLigne-like array (Dolibarr's Facture::create() accepts these in $lines).
  */
@@ -353,4 +379,3 @@ function makeLine($desc, $qty, $subprice)
         'info_bits'      => 0,
     );
 }
-

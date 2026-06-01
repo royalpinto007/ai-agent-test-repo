@@ -70,6 +70,7 @@ print '        <i class="fa fa-cloud-upload-alt"></i>';
 print '        <div class="ebr-dz-text">';
 print '          <div class="ebr-t1">'.$langs->trans("DropOrBrowse").'</div>';
 print '          <div class="ebr-t2">'.$langs->trans("PayoutMatchExplain").'</div>';
+print '          <div class="ebr-selected-file" id="ebrSelectedFile">'.$langs->trans("NoFileSelected").'</div>';
 print '        </div>';
 print '        <input type="file" name="payoutcsv" accept=".csv,text/csv" required />';
 print '      </label>';
@@ -111,6 +112,9 @@ if ($reconcileResult) {
     if ($payout) {
         print '<div class="ebr-payoutbanner">';
         print '<i class="fa fa-coins"></i> ';
+        if (!empty($reconcileResult['source_file'])) {
+            print '<span class="ebr-sub"><strong>File:</strong> '.dol_escape_htmltag($reconcileResult['source_file']).'</span> &middot; ';
+        }
         print 'Payout <code>'.dol_escape_htmltag($payout['id']).'</code> &middot; ';
         print dol_escape_htmltag($payout['date']).' &middot; ';
         print dol_escape_htmltag($payout['method']);
@@ -131,6 +135,16 @@ if ($reconcileResult) {
     print '<button class="button" id="ebrDlJson" type="button">JSON</button>';
     print '</div>';
     print '<div class="ebr-body">';
+
+    print '<div class="ebr-helpbox">';
+    print '<div class="ebr-helpbox-title"><i class="fa fa-info-circle"></i> '.$langs->trans("ReconcileHelpTitle").'</div>';
+    print '<ul class="ebr-helpbox-list">';
+    print '<li>'.$langs->trans("ReconcileHelpPoint1").'</li>';
+    print '<li>'.$langs->trans("ReconcileHelpPoint2").'</li>';
+    print '<li>'.$langs->trans("ReconcileHelpPoint3").'</li>';
+    print '<li>'.$langs->trans("ReconcileHelpPoint4").'</li>';
+    print '</ul>';
+    print '</div>';
 
     // Filters
     print '<div class="ebr-filters">';
@@ -153,7 +167,7 @@ if ($reconcileResult) {
     print '<th data-key="diff" class="num">'.$langs->trans("ColDiff").'</th>';
     print '<th data-key="dolibarr_order_ref">'.$langs->trans("ColSORef").'</th>';
     print '<th data-key="invoice_refs">'.$langs->trans("ColInvoices").'</th>';
-    print '<th data-key="notes">'.$langs->trans("ColNotes").'</th>';
+    print '<th data-key="notes" class="ebr-col-notes">'.$langs->trans("ColNotes").'</th>';
     print '<th>'.$langs->trans("ColAction").'</th>';
     print '</tr></thead>';
     print '<tbody id="ebrTbody"></tbody>';
@@ -174,9 +188,24 @@ if ($reconcileResult) {
         'orderUrlTemplate'     => DOL_URL_ROOT.'/commande/card.php?id={id}',
         'actionUrl'            => dol_buildpath('/ebayreconcile/action.php', 1),
         'token'                => newToken(),
+        'i18n'                 => array(
+            'NotesPlaceholder' => $langs->trans("NotesPlaceholder"),
+            'Saving'           => $langs->trans("Saving"),
+            'Saved'            => $langs->trans("Saved"),
+            'SaveFailed'       => $langs->trans("SaveFailed"),
+        ),
     );
     print '<script>window.EBR_BOOT = '.json_encode($bootstrap).';</script>';
 }
+
+print '<script>window.EBR_UPLOAD_I18N = '.json_encode(array(
+    'NoFileSelected' => $langs->trans("NoFileSelected"),
+    'SelectedFile'   => $langs->trans("SelectedFile"),
+    'AddNote'        => $langs->trans("AddNote"),
+    'EditNote'       => $langs->trans("EditNote"),
+    'SaveNote'       => $langs->trans("SaveNote"),
+    'Cancel'         => $langs->trans("Cancel"),
+)).';</script>';
 
 // JS for filters / sorting / bulk + per-row actions
 print '<script src="'.dol_buildpath('/ebayreconcile/js/ebayreconcile.js', 1).'"></script>';
