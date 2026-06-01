@@ -183,25 +183,53 @@ class EbayReconciler
      */
     protected function reconcileOneOrder($orderNumber, $g)
     {
+        $hasRefund = $this->groupHasRefund($g);
         $base = array(
             'order_number' => $orderNumber,
             'ebay_net'     => $g['ebayNet'],
             'ebay_rows'    => $g['rows'],
             'ebay_types'   => $g['types'],
             'ebay_lines'   => $g['lines'],
+            'has_refund'   => $hasRefund,
         );
 
         // 1. Find the SO by ref_client.
         $so = $this->findSalesOrder($orderNumber);
         if (!$so) {
+            $docs = $this->findInvoicesAndCreditNotes($orderNumber);
+            $invoices = array_filter($docs, function ($d) { return $d['type'] === 'invoice'; });
+            if (count($invoices) === 0) {
+                return array_merge($base, array(
+                    'dolibarr_order_ref' => null,
+                    'dolibarr_order_id'  => null,
+                    'dolibarr_net'       => 0,
+                    'diff'               => round($g['ebayNet'], 2),
+                    'invoices'           => array(),
+                    'status'             => 'MISSING_IN_DOLIBARR',
+                    'notes'              => 'No sales order with this ref_client',
+                ));
+            }
+
+            // dolNet = amount still due (remaining to pay), not gross invoice total.
+            $dolNet = 0.0;
+            foreach ($docs as $d) {
+                $dolNet += (float) $d['remain_to_pay'];
+            }
+            $dolNet = round($dolNet, 2);
+            $diff = round($g['ebayNet'] - $dolNet, 2);
+            $status = abs($diff) > $this->matchTolerance ? 'MISMATCH' : 'MATCH';
+            $notes = $status === 'MATCH'
+                ? 'No sales order with this ref_client, but invoice exists'
+                : 'No sales order with this ref_client; invoice exists but totals differ';
+
             return array_merge($base, array(
                 'dolibarr_order_ref' => null,
                 'dolibarr_order_id'  => null,
-                'dolibarr_net'       => 0,
-                'diff'               => round($g['ebayNet'], 2),
-                'invoices'           => array(),
-                'status'             => 'MISSING_IN_DOLIBARR',
-                'notes'              => 'No sales order with this ref_client',
+                'dolibarr_net'       => $dolNet,
+                'diff'               => $diff,
+                'invoices'           => array_values($docs),
+                'status'             => $status,
+                'notes'              => $notes,
             ));
         }
 
@@ -209,15 +237,20 @@ class EbayReconciler
         $docs = $this->findInvoicesAndCreditNotes($orderNumber);
         $invoices = array_filter($docs, function ($d) { return $d['type'] === 'invoice'; });
 
-        // 3. dolNet = sum of ALL docs (invoices AND credit notes). Dolibarr stores
-        //    CN total_ht as already-negative, so summing both gives the net customer
-        //    position. We deliberately do NOT use Dolibarr's discount mechanism in
-        //    Approve, so this approach does not double-count.
+        // 3. dolNet = the amount still DUE in Dolibarr (remaining to pay), summed
+        //    across invoices and credit notes — NOT the gross invoice total.
+        //    getRemainToPay() is signed (credit notes come back negative), so the
+        //    sum is the net customer position still outstanding. Using the due
+        //    amount means an invoice already settled in an earlier cycle contributes
+        //    0, so a later eBay refund no longer cancels against a long-paid invoice.
         $dolNet = 0.0;
         foreach ($docs as $d) {
-            $dolNet += (float) $d['total_ht'];
+            $dolNet += (float) $d['remain_to_pay'];
         }
         $dolNet = round($dolNet, 2);
+        // Compare eBay net cash against the Dolibarr amount due, on the same sign
+        // basis: eBay - Dolibarr. A refund (negative eBay) only nets to ~0 when a
+        // matching credit note carries the offsetting negative due.
         $diff = round($g['ebayNet'] - $dolNet, 2);
 
         if (count($invoices) === 0) {
@@ -240,6 +273,21 @@ class EbayReconciler
             'status'             => $status,
             'notes'              => $notes,
         ));
+    }
+
+    protected function groupHasRefund($g)
+    {
+        if (!empty($g['types'])) {
+            foreach ($g['types'] as $type) {
+                if (strcasecmp(trim((string) $type), 'Refund') === 0) return true;
+            }
+        }
+        if (!empty($g['lines'])) {
+            foreach ($g['lines'] as $line) {
+                if (!empty($line['type']) && strcasecmp(trim((string) $line['type']), 'Refund') === 0) return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -265,11 +313,13 @@ class EbayReconciler
 
     /**
      * Find invoices (type=0) AND credit notes (type=2) by ref_client.
-     * Returns [{id, ref, type:'invoice'|'credit_note', total_ht}, ...]
+     * Returns [{id, ref, type:'invoice'|'credit_note', total_ht, is_paid, remain_to_pay}, ...]
      */
     public function findInvoicesAndCreditNotes($orderNumber)
     {
-        $sql = "SELECT rowid, ref, type, total_ht FROM " . MAIN_DB_PREFIX . "facture";
+        require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+
+        $sql = "SELECT rowid, ref, type, total_ht, paye FROM " . MAIN_DB_PREFIX . "facture";
         $sql .= " WHERE ref_client = '" . $this->db->escape($orderNumber) . "'";
         $sql .= " AND entity IN (" . getEntity('facture') . ")";
         $sql .= " AND type IN (0, 2)";
@@ -278,11 +328,25 @@ class EbayReconciler
         if (!$res) return array();
         $out = array();
         while ($obj = $this->db->fetch_object($res)) {
+            $isCreditNote = ((int) $obj->type === 2);
+            // Remaining-to-pay (amount still DUE) for BOTH invoices and credit
+            // notes. getRemainToPay() returns it signed — credit notes come back
+            // negative — so summing across docs gives the net outstanding position
+            // used as dolNet in reconcileOneOrder.
+            $remainToPay = 0.0;
+            $facture = new Facture($this->db);
+            if ($facture->fetch((int) $obj->rowid) > 0) {
+                $remainToPay = (float) (method_exists($facture, 'getRemainToPay')
+                    ? $facture->getRemainToPay()
+                    : ($facture->total_ttc - $facture->getSommePaiement()));
+            }
             $out[] = array(
                 'id'       => (int) $obj->rowid,
                 'ref'      => $obj->ref,
-                'type'     => ((int) $obj->type === 2) ? 'credit_note' : 'invoice',
+                'type'     => $isCreditNote ? 'credit_note' : 'invoice',
                 'total_ht' => (float) $obj->total_ht,
+                'is_paid'  => abs($remainToPay) <= 0.00001,
+                'remain_to_pay' => round($remainToPay, 2),
             );
         }
         return $out;
