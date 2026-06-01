@@ -4,6 +4,66 @@
    bulk Approve, bulk Pay, and saves payout summary on Pay all success. */
 
 (function () {
+    function uploadT(key, fallback) {
+        var dict = window.EBR_UPLOAD_I18N || {};
+        return dict[key] || fallback;
+    }
+
+    function initUploadUi() {
+        var input = document.querySelector('#ebrUploadForm input[type="file"][name="payoutcsv"]');
+        var label = document.getElementById('ebrSelectedFile');
+        if (!input || !label) return;
+
+        function showSelected() {
+            var file = input.files && input.files[0];
+            label.textContent = file
+                ? uploadT('SelectedFile', 'Selected file:') + ' ' + file.name
+                : uploadT('NoFileSelected', 'No file selected yet.');
+        }
+        input.addEventListener('change', showSelected);
+
+        // Drag-and-drop onto the dropzone. The markup advertises "Drop or
+        // Browse", but without these handlers a dropped file just makes the
+        // browser navigate to it. Wire drop -> populate the file input.
+        var zone = (input.closest && input.closest('.ebr-dropzone'))
+            || document.querySelector('#ebrUploadForm .ebr-dropzone');
+        if (!zone) return;
+
+        function squelch(e) { e.preventDefault(); e.stopPropagation(); }
+        ['dragenter', 'dragover'].forEach(function (ev) {
+            zone.addEventListener(ev, function (e) { squelch(e); zone.classList.add('ebr-dragover'); });
+        });
+        ['dragleave', 'dragend'].forEach(function (ev) {
+            zone.addEventListener(ev, function (e) { squelch(e); zone.classList.remove('ebr-dragover'); });
+        });
+        zone.addEventListener('drop', function (e) {
+            squelch(e);
+            zone.classList.remove('ebr-dragover');
+            var files = e.dataTransfer && e.dataTransfer.files;
+            if (!files || !files.length) return;
+            var file = files[0];
+            // Accept only CSV, matching the input's accept attribute.
+            var okName = /\.csv$/i.test(file.name);
+            var okType = !file.type || /csv|excel|text\/plain/i.test(file.type);
+            if (!okName && !okType) {
+                label.textContent = uploadT('InvalidFileType', 'Please drop a .csv payout file.');
+                return;
+            }
+            // Programmatically assign the dropped file to the <input> so the
+            // normal form submit carries it. Needs DataTransfer (modern browsers).
+            try {
+                var dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+            } catch (err) {
+                label.textContent = uploadT('DragDropUnsupported', 'Drag-and-drop is not supported in this browser — click to browse instead.');
+                return;
+            }
+            showSelected();
+        });
+    }
+
+    initUploadUi();
     if (!window.EBR_BOOT) return; // page rendered without results (just upload form)
 
     var state = {
@@ -15,12 +75,14 @@
         token: window.EBR_BOOT.token,
         invoiceUrlTemplate: window.EBR_BOOT.invoiceUrlTemplate,
         orderUrlTemplate: window.EBR_BOOT.orderUrlTemplate,
+        i18n: window.EBR_BOOT.i18n || {},
         filter: "ALL",
         query: "",
-        sortKey: "status",
+        sortKey: null,
         sortDir: 1,
         pending: null,    // approve modal pending
         pendingCreate: null, // create-invoice modal pending
+        pendingBulkPay: null,
     };
     window.__EBR = state; // for debugging
 
@@ -32,6 +94,7 @@
     }
     function soUrl(id)  { return state.orderUrlTemplate.replace("{id}", id); }
     function invUrl(id) { return state.invoiceUrlTemplate.replace("{id}", id); }
+    function t(key, fallback) { return state.i18n[key] || fallback; }
 
     function pickLargestInvoice(r) {
         var invs = (r.invoices || []).filter(function (i) { return i.type === "invoice"; });
@@ -93,6 +156,10 @@
         }
         if (parts.length) return parts.join(' ');
 
+        if (r.status === 'MATCH' && (r.invoices || []).some(function (i) { return i.type === 'invoice'; }) && !hasPayableInvoice(r)) {
+            return '<span class="ebr-actiontag paid"><i class="fa fa-check-circle"></i> already paid</span>';
+        }
+
         if (!state.writePerm) return '';
 
         if (r.status === 'MISMATCH') {
@@ -104,6 +171,39 @@
             return '<button class="button" data-create="' + esc(r.order_number) + '"><i class="fa fa-file-invoice"></i> Create invoice</button>';
         }
         return '';
+    }
+
+    function noteCell(r) {
+        var status = r._noteStatus
+            ? '<span class="ebr-note-status' + (r._noteStatusError ? ' err' : '') + '">' + esc(r._noteStatus) + '</span>'
+            : '';
+        var isEditing = !!r._noteEditing;
+        var hasNote = !!(r.notes && String(r.notes).trim() !== '');
+        if (!state.writePerm) {
+            return hasNote
+                ? '<div class="ebr-note-view">' + esc(r.notes) + '</div>' + status
+                : status;
+        }
+        if (isEditing) {
+            return ''
+                + '<textarea class="ebr-note-input' + (r._noteSaving ? ' is-saving' : '') + '"'
+                + ' data-note-order="' + esc(r.order_number) + '"'
+                + ' placeholder="' + esc(t('NotesPlaceholder', 'Add a note for this order')) + '">'
+                + esc(r._noteDraft !== undefined ? r._noteDraft : (r.notes || '')) + '</textarea>'
+                + '<div class="ebr-note-actions">'
+                + '<button class="button" type="button" data-note-save="' + esc(r.order_number) + '">' + esc(t('SaveNote', 'Save note')) + '</button>'
+                + '<button class="button" type="button" data-note-cancel="' + esc(r.order_number) + '">' + esc(t('Cancel', 'Cancel')) + '</button>'
+                + '</div>'
+                + status;
+        }
+        return ''
+            + (hasNote ? '<div class="ebr-note-view">' + esc(r.notes) + '</div>' : '')
+            + '<div class="ebr-note-actions">'
+            + '<button class="button" type="button" data-note-edit="' + esc(r.order_number) + '">'
+            + esc(hasNote ? t('EditNote', 'Edit note') : uploadT('AddNote', 'Add note'))
+            + '</button>'
+            + '</div>'
+            + status;
     }
 
     function esc(s) {
@@ -120,9 +220,51 @@
                 || r.status === 'NO_LINKED_INVOICES' && !r._adjusted;
         });
     }
+    function hasPayableInvoice(r) {
+        return (r.invoices || []).some(function (i) {
+            return i.type === 'invoice' && Number(i.remain_to_pay || 0) > 0.00001;
+        });
+    }
+    function approveActionForRow(r) {
+        var diff = Number(r.diff || 0);
+        // Refund-led rows use diff = ebay + dolibarr, so the correction
+        // direction is inverted compared with normal sale rows.
+        if (r.has_refund && Number(r.ebay_net || 0) < 0) {
+            return diff < 0 ? 'invoice' : 'credit_note';
+        }
+        return diff < 0 ? 'credit_note' : 'invoice';
+    }
+    function recalcRowAfterAdjustment(row, action, newInvoiceId, newInvoiceRef, amount, signedAmountOverride) {
+        if (!row) return;
+        var signedAmount = signedAmountOverride !== undefined && signedAmountOverride !== null
+            ? Number(signedAmountOverride || 0)
+            : (action === 'credit_note' ? -Math.abs(Number(amount || 0)) : Math.abs(Number(amount || 0)));
+        row.invoices = row.invoices || [];
+        row.invoices.push({
+            id: Number(newInvoiceId || 0),
+            ref: newInvoiceRef || ('#' + newInvoiceId),
+            type: action === 'credit_note' ? 'credit_note' : 'invoice',
+            total_ht: signedAmount,
+            is_paid: action === 'credit_note',
+            remain_to_pay: action === 'credit_note' ? 0 : Math.max(0, Number(signedAmount)),
+        });
+        row.dolibarr_net = Number(row.dolibarr_net || 0) + signedAmount;
+        var ebay = Number(row.ebay_net || 0);
+        var dol = Number(row.dolibarr_net || 0);
+        var nextDiff = row.has_refund && ebay < 0
+            ? Number((ebay + dol).toFixed(2))
+            : Number((ebay - dol).toFixed(2));
+        row.diff = nextDiff;
+        if (Math.abs(nextDiff) <= 0.01) {
+            row.status = 'MATCH';
+            row.notes = row.notes || '';
+        } else {
+            row.status = 'MISMATCH';
+        }
+    }
     function rowsToPay() {
         return state.results.filter(function (r) {
-            return !r._paid && (r.status === 'MATCH' || r._adjusted);
+            return !r._paid && (r._adjusted || (r.status === 'MATCH' && hasPayableInvoice(r)));
         });
     }
     function eligibleMismatches() {
@@ -150,20 +292,22 @@
             });
         }
         var k = state.sortKey, dir = state.sortDir;
-        var numericKeys = { ebay_net:1, dolibarr_net:1, diff:1 };
-        rows.sort(function (a, b) {
-            var av = a[k], bv = b[k];
-            if (k === 'invoice_refs') {
-                av = (a.invoices||[]).map(function(i){return i.ref||'';}).join(',');
-                bv = (b.invoices||[]).map(function(i){return i.ref||'';}).join(',');
-            }
-            if (numericKeys[k]) { av = Number(av); bv = Number(bv); }
-            if (av === undefined || av === null) av = '';
-            if (bv === undefined || bv === null) bv = '';
-            if (av < bv) return -1 * dir;
-            if (av > bv) return  1 * dir;
-            return 0;
-        });
+        if (k) {
+            var numericKeys = { ebay_net:1, dolibarr_net:1, diff:1 };
+            rows.sort(function (a, b) {
+                var av = a[k], bv = b[k];
+                if (k === 'invoice_refs') {
+                    av = (a.invoices||[]).map(function(i){return i.ref||'';}).join(',');
+                    bv = (b.invoices||[]).map(function(i){return i.ref||'';}).join(',');
+                }
+                if (numericKeys[k]) { av = Number(av); bv = Number(bv); }
+                if (av === undefined || av === null) av = '';
+                if (bv === undefined || bv === null) bv = '';
+                if (av < bv) return -1 * dir;
+                if (av > bv) return  1 * dir;
+                return 0;
+            });
+        }
 
         var tbody = document.getElementById('ebrTbody');
         if (rows.length === 0) {
@@ -180,7 +324,7 @@
                     + '<td class="num">' + diffCell(r.diff) + '</td>'
                     + '<td>' + (r.dolibarr_order_ref && r.dolibarr_order_id ? '<a href="' + soUrl(r.dolibarr_order_id) + '" target="_blank" rel="noopener">' + esc(r.dolibarr_order_ref) + '</a>' : esc(r.dolibarr_order_ref || '')) + '</td>'
                     + '<td>' + invoicesCell(r) + '</td>'
-                    + '<td><span class="ebr-sub">' + esc(r.notes || '') + '</span></td>'
+                    + '<td class="ebr-cell-notes">' + noteCell(r) + '</td>'
                     + '<td>' + actionCell(r) + '</td>'
                 + '</tr>';
             }).join('');
@@ -203,15 +347,17 @@
         var bulkA = document.getElementById('ebrBulkApprove');
         if (bulkA) {
             var n = eligibleMismatches().length;
-            bulkA.hidden = !state.writePerm || n === 0;
+            bulkA.hidden = !state.writePerm;
+            bulkA.disabled = n === 0;
+            bulkA.classList.toggle('ebr-bulk-disabled', n === 0);
             bulkA.textContent = 'Approve all mismatches (' + n + ')';
         }
         var bulkC = document.getElementById('ebrBulkCreate');
         if (bulkC) {
             var nc = eligibleCreates().length;
-            // Only show when there are 2+ rows to create — single rows use the
-            // per-row Create invoice button.
-            bulkC.hidden = !state.writePerm || nc < 2;
+            bulkC.hidden = !state.writePerm;
+            bulkC.disabled = nc === 0;
+            bulkC.classList.toggle('ebr-bulk-disabled', nc === 0);
             bulkC.textContent = 'Create all invoices (' + nc + ')';
         }
         var bulkP = document.getElementById('ebrBulkPay');
@@ -219,16 +365,14 @@
             var unresolved = unresolvedRows().length;
             var toPay = rowsToPay().length;
             var ready = state.writePerm && state.payout && state.payout.id && state.payout.date_unix;
-            if (!ready || (toPay === 0 && unresolved === 0)) {
-                bulkP.hidden = true;
-            } else {
-                bulkP.hidden = false;
-                bulkP.disabled = unresolved > 0;
-                bulkP.style.opacity = unresolved > 0 ? 0.55 : '';
-                bulkP.textContent = unresolved > 0
-                    ? 'Pay all (resolve ' + unresolved + ' first)'
-                    : 'Pay all (' + toPay + ')';
-            }
+            bulkP.hidden = !state.writePerm;
+            bulkP.style.display = '';
+            bulkP.disabled = !ready || unresolved > 0 || toPay === 0;
+            bulkP.classList.toggle('ebr-bulk-disabled', !ready || unresolved > 0 || toPay === 0);
+            bulkP.style.opacity = '';
+            bulkP.textContent = unresolved > 0
+                ? 'Pay all (resolve ' + unresolved + ' first)'
+                : 'Pay all (' + toPay + ')';
         }
     }
 
@@ -267,7 +411,7 @@
         var target = pickLargestInvoice(r);
         if (!target) { showToast('No parent invoice to credit against', true); return; }
         var diff = Number(r.diff);
-        var action = diff < 0 ? 'credit_note' : 'invoice';
+        var action = approveActionForRow(r);
         var amount = Math.abs(diff);
 
         state.pending = {
@@ -275,6 +419,7 @@
             orderNumber: r.order_number,
             parentInvoiceId: target.id,
             amount: amount,
+            note: r.notes || '',
         };
 
         var modal = ensureModal('ebrApproveModal',
@@ -315,7 +460,10 @@
         jpost('approve', state.pending).then(function (data) {
             if (!data.ok) throw new Error(data.error || 'n8n returned ok=false');
             var target = state.results.find(function (x) { return x.order_number === state.pending.orderNumber; });
-            if (target) target._adjusted = data;
+            if (target) {
+                target._adjusted = data;
+                recalcRowAfterAdjustment(target, data.action, data.newInvoiceId, data.newInvoiceRef, data.amount);
+            }
             showToast(data.message + ' <a href="' + data.dolibarrEditUrl + '" target="_blank">Open</a>', false);
             document.getElementById('ebrApproveModal').classList.remove('open');
             state.pending = null;
@@ -340,6 +488,7 @@
             ebayNet: r.ebay_net,
             lines: lines,
             parentSoId: hasSO ? r.dolibarr_order_id : null,
+            note: r.notes || '',
         };
 
         var modal = ensureModal('ebrCreateModal',
@@ -394,6 +543,7 @@
                     applied: false,
                     dolibarrEditUrl: data.dolibarrEditUrl,
                 };
+                recalcRowAfterAdjustment(target, 'invoice', data.newInvoiceId, data.newInvoiceRef, data.totalHt, data.totalHt);
             }
             showToast(data.message + ' <a href="' + data.dolibarrEditUrl + '" target="_blank">Open</a>', false);
             document.getElementById('ebrCreateModal').classList.remove('open');
@@ -415,10 +565,11 @@
             return {
                 row: r,
                 payload: {
-                    action: diff < 0 ? 'credit_note' : 'invoice',
+                    action: approveActionForRow(r),
                     orderNumber: r.order_number,
                     parentInvoiceId: target.id,
                     amount: Math.abs(diff),
+                    note: r.notes || '',
                 },
             };
         });
@@ -460,6 +611,7 @@
                     ebayNet: r.ebay_net,
                     lines: lines,
                     parentSoId: hasSO ? r.dolibarr_order_id : null,
+                    note: r.notes || '',
                 },
             };
         });
@@ -503,7 +655,50 @@
         }
         var elig = rowsToPay();
         if (!elig.length) return;
-        if (!confirm('Pay ' + elig.length + ' order(s) using payout ' + state.payout.id + '?')) return;
+        openBulkPayModal(elig);
+    }
+
+    function openBulkPayModal(elig) {
+        state.pendingBulkPay = elig.slice();
+        var modal = ensureModal('ebrBulkPayModal',
+            '<div class="ebr-modal" style="width:520px;">'
+            + '<div class="mhead"><i class="fa fa-money-check-alt"></i> Pay all matched orders</div>'
+            + '<div class="mbody"><dl id="ebrBulkPayBody"></dl>'
+            + '<div class="mnote">Confirm will record payments in Dolibarr using this payout reference. Rows with no remaining balance will be skipped automatically.</div>'
+            + '<div id="ebrBulkPayErr" class="ebr-error" hidden></div></div>'
+            + '<div class="mfoot"><button class="button" id="ebrBulkPayCancel">Cancel</button>'
+            + '<button class="butAction" id="ebrBulkPayConfirm">Confirm</button></div>'
+            + '</div>');
+
+        var totalRemain = elig.reduce(function (sum, row) {
+            return sum + (row.invoices || []).reduce(function (inner, inv) {
+                return inner + (inv.type === 'invoice' ? Number(inv.remain_to_pay || 0) : 0);
+            }, 0);
+        }, 0);
+        document.getElementById('ebrBulkPayBody').innerHTML =
+            '<dt>Payout</dt><dd><code>' + esc(state.payout.id) + '</code></dd>' +
+            '<dt>Payout date</dt><dd>' + esc(state.payout.date || '-') + '</dd>' +
+            '<dt>Orders to pay</dt><dd><strong>' + elig.length + '</strong></dd>' +
+            '<dt>Estimated payable</dt><dd><strong>' + totalRemain.toFixed(2) + '</strong></dd>';
+
+        var confirmBtn = document.getElementById('ebrBulkPayConfirm');
+        confirmBtn.onclick = confirmBulkPay;
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm';
+        document.getElementById('ebrBulkPayCancel').onclick = function () {
+            modal.classList.remove('open');
+            state.pendingBulkPay = null;
+        };
+        document.getElementById('ebrBulkPayErr').hidden = true;
+        modal.classList.add('open');
+    }
+
+    function confirmBulkPay() {
+        var elig = state.pendingBulkPay || [];
+        if (!elig.length) return;
+        var btn = document.getElementById('ebrBulkPayConfirm');
+        btn.disabled = true;
+        btn.textContent = 'Paying...';
         showToast('Paying ' + elig.length + '...', false);
         var done = 0, ok = 0, fail = 0, noop = 0;
         var cursor = 0;
@@ -516,6 +711,7 @@
                         orderNumber: row.order_number,
                         payoutId: state.payout.id,
                         payoutDateUnix: state.payout.date_unix,
+                        note: row.notes || '',
                     };
                     jpost('pay', payload).then(function (data) {
                         row._paid = data;
@@ -545,11 +741,22 @@
             });
         }
         Promise.all([worker(), worker(), worker()]).then(function () {
+            var modal = document.getElementById('ebrBulkPayModal');
+            if (modal) modal.classList.remove('open');
+            state.pendingBulkPay = null;
             if (ok > 0) savePayoutSummary().catch(function(){});
             var bits = [ok + ' paid'];
             if (fail > 0) bits.push(fail + ' failed');
             if (noop > 0) bits.push(noop + ' nothing to pay');
             showToast('Bulk pay done: ' + bits.join(', '), fail > 0);
+        }).catch(function (err) {
+            var errBox = document.getElementById('ebrBulkPayErr');
+            if (errBox) {
+                errBox.textContent = err && err.message ? err.message : 'Bulk pay failed';
+                errBox.hidden = false;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Retry';
         });
     }
 
@@ -598,6 +805,38 @@
         setTimeout(function () { t.remove(); }, isError ? 8000 : 6000);
     }
 
+    function saveNote(orderNumber, note, el) {
+        var row = state.results.find(function (x) { return x.order_number === orderNumber; });
+        if (!row) return;
+        row.notes = note;
+        row._noteSaving = true;
+        row._noteStatus = t('Saving', 'Saving...');
+        row._noteStatusError = false;
+        render();
+
+        jpost('save_note', { orderNumber: orderNumber, note: note }).then(function (data) {
+            if (!data.ok) throw new Error(data.error || 'save_note returned ok=false');
+            row._noteSaving = false;
+            row._noteStatus = t('Saved', 'Saved');
+            row._noteStatusError = false;
+            row._noteEditing = false;
+            row._noteDraft = undefined;
+            render();
+            setTimeout(function () {
+                if (row._noteStatus === t('Saved', 'Saved')) {
+                    row._noteStatus = '';
+                    render();
+                }
+            }, 1600);
+        }).catch(function (err) {
+            row._noteSaving = false;
+            row._noteStatus = t('SaveFailed', 'Save failed') + ': ' + err.message;
+            row._noteStatusError = true;
+            render();
+            if (el) el.focus();
+        });
+    }
+
     // ---------- Wiring ----------
 
     document.addEventListener('click', function (e) {
@@ -605,6 +844,36 @@
         if (ap) { e.preventDefault(); openApproveModal(ap.dataset.approve); return; }
         var cr = e.target.closest('[data-create]');
         if (cr) { e.preventDefault(); openCreateInvoiceModal(cr.dataset.create); return; }
+        var noteEdit = e.target.closest('[data-note-edit]');
+        if (noteEdit) {
+            var rowEdit = state.results.find(function (x) { return x.order_number === noteEdit.dataset.noteEdit; });
+            if (rowEdit) {
+                rowEdit._noteEditing = true;
+                rowEdit._noteDraft = rowEdit.notes || '';
+                render();
+            }
+            return;
+        }
+        var noteCancel = e.target.closest('[data-note-cancel]');
+        if (noteCancel) {
+            var rowCancel = state.results.find(function (x) { return x.order_number === noteCancel.dataset.noteCancel; });
+            if (rowCancel) {
+                rowCancel._noteEditing = false;
+                rowCancel._noteDraft = undefined;
+                rowCancel._noteStatus = '';
+                rowCancel._noteStatusError = false;
+                render();
+            }
+            return;
+        }
+        var noteSave = e.target.closest('[data-note-save]');
+        if (noteSave) {
+            var rowSave = state.results.find(function (x) { return x.order_number === noteSave.dataset.noteSave; });
+            if (rowSave) {
+                saveNote(rowSave.order_number, rowSave._noteDraft || '', null);
+            }
+            return;
+        }
         var chip = e.target.closest('.ebr-chip');
         if (chip) {
             document.querySelectorAll('.ebr-chip').forEach(function (c) { c.classList.remove('active'); });
@@ -621,6 +890,14 @@
             render();
             return;
         }
+    });
+
+    document.addEventListener('input', function (e) {
+        var note = e.target.closest('.ebr-note-input');
+        if (!note) return;
+        var row = state.results.find(function (x) { return x.order_number === note.dataset.noteOrder; });
+        if (!row) return;
+        row._noteDraft = note.value;
     });
 
     var search = document.getElementById('ebrSearch');

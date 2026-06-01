@@ -13,6 +13,12 @@
 .ebr-titrebar i { color: rgb(0,112,124); }
 .ebr-titrebar .ebr-spacer { flex: 1; }
 .ebr-titrebar button { margin-left: 6px; }
+.ebr-titrebar button:disabled,
+.ebr-bulk-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.15);
+}
 .ebr-body { padding: 14px; }
 
 .ebr-dropzone {
@@ -23,9 +29,22 @@
     background: #fbfcfd;
     cursor: pointer;
 }
+.ebr-dropzone.ebr-dragover {
+    border-color: rgb(0,112,124);
+    background: #eef8ff;
+}
 .ebr-dropzone i { font-size: 24px; color: rgb(0,112,124); }
 .ebr-dz-text .ebr-t1 { font-weight: 600; }
 .ebr-dz-text .ebr-t2 { color: #6a7378; font-size: 12px; margin-top: 2px; }
+.ebr-selected-file {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #eef8ff;
+    border: 1px solid #d6e7f2;
+    border-radius: 4px;
+    color: #264257;
+    font-size: 12px;
+}
 .ebr-dropzone input[type=file] { display: none; }
 
 .ebr-error {
@@ -53,10 +72,81 @@
 .ebr-payoutbanner i { color: rgb(38,167,225); margin-right: 6px; }
 
 .ebr-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.ebr-helpbox {
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    background: #eef8ff;
+    border: 1px solid #bfdbef;
+    border-radius: 4px;
+    color: #264257;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+.ebr-helpbox-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.ebr-helpbox-title i { color: rgb(0,112,124); }
+.ebr-helpbox-list {
+    margin: 0;
+    padding-left: 18px;
+}
+.ebr-helpbox-list li { margin: 5px 0; }
 .ebr-filters input[type=search] {
     min-width: 240px; padding: 5px 8px;
     border: 1px solid #c7d0d6; border-radius: 4px;
 }
+.ebr-note-input {
+    width: 100%;
+    min-width: 220px;
+    min-height: 54px;
+    padding: 6px 8px;
+    border: 1px solid #c7d0d6;
+    border-radius: 4px;
+    resize: vertical;
+    font: inherit;
+    line-height: 1.35;
+    box-sizing: border-box;
+    background: #fff;
+}
+.ebr-note-view {
+    min-height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #324049;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+.ebr-note-view.empty {
+    color: #6a7378;
+    font-style: italic;
+}
+.ebr-note-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+.ebr-note-actions .button {
+    margin: 0;
+}
+.ebr-note-input.is-saving {
+    background: #f7fbfd;
+    border-color: #79adc9;
+}
+.ebr-note-status {
+    display: block;
+    margin-top: 4px;
+    font-size: 10.5px;
+    color: #6a7378;
+}
+.ebr-note-status.err { color: #b3261e; }
 .ebr-chip {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 9px;
@@ -71,6 +161,11 @@
 
 .ebr-tablewrap { max-height: 65vh; overflow: auto; border: 1px solid #d4d4d4; border-radius: 4px; background: #fff; }
 .ebr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ebr-table .ebr-col-notes,
+.ebr-table td.ebr-cell-notes {
+    min-width: 240px;
+    width: 240px;
+}
 .ebr-table tr.liste_titre th {
     position: sticky; top: 0; z-index: 2;
     background: #f1f5f7; border-bottom: 1px solid #d8dde1;
@@ -133,12 +228,21 @@
 .ebr-toast.err { background: #b3261e; }
 .ebr-toast a { color: #fff; text-decoration: underline; }
 
-/* History page table — explicit column widths so right-aligned numeric
-   cells visually sit close to their headers rather than floating off in
-   excess whitespace. */
-.ebr-history-table { table-layout: fixed; }
-.ebr-history-table th, .ebr-history-table td {
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* History page table.
+   Let the outer table size naturally so key columns such as payout id/date
+   and settled-at don't get hard-truncated by fixed-layout ellipsis rules. */
+.ebr-history-table { table-layout: auto; }
+.ebr-history-table th {
+    white-space: nowrap;
+}
+.ebr-history-table td {
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+.ebr-history-table code {
+    display: inline;
+    vertical-align: bottom;
 }
 
 /* Detail row on history page.
@@ -148,14 +252,33 @@
    inner table's <td> cells and crushed them flat (no padding → Payment
    id column unreadable). Direct-child combinator scopes the reset. */
 .ebr-detail > td { background: #fafbfc; padding: 0 !important; }
-.ebr-detail-inner { padding: 8px 14px; }
-.ebr-detail-inner table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ebr-detail-inner {
+    padding: 8px 14px;
+    overflow-x: auto;
+    display: flex;
+    justify-content: flex-end;
+}
+.ebr-detail-inner table {
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-left: 0;
+}
+.ebr-history-detail-table {
+    display: inline-table;
+    width: auto;
+    min-width: 0;
+    table-layout: fixed;
+}
 .ebr-detail-inner th {
     text-align: left; font-weight: 600; color: #6a7378;
     padding: 5px 8px; border-bottom: 1px solid #d8dde1;
     background: #f1f5f7;
 }
 .ebr-detail-inner th.num { text-align: right; }
+.ebr-history-detail-table th:last-child,
+.ebr-history-detail-table td:last-child {
+    text-align: right;
+}
 .ebr-detail-inner td {
     padding: 5px 8px; border-bottom: 1px solid var(--softborder);
     vertical-align: middle;
