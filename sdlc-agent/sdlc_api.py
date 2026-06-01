@@ -493,16 +493,27 @@ def set_milestone_endpoint():
 
 
 def _behat_gen_prompt(title, brd):
-    return f"""Generate a Moodle Behat feature (Gherkin) that smoke-tests this requirement on a FRESH IOMAD test site and captures screenshots as evidence.
+    brd = brd or ""
+    # Pull the Test Cases section out of the (often long) BRD so every case is
+    # included regardless of where it sits — the old flat char-cap frequently
+    # truncated the BRD before reaching the test cases.
+    import re as _re
+    m = _re.search(r'(?is)\n#+\s*test cases\b.*', brd)
+    test_cases = m.group(0).strip()[:3500] if m else ""
+    context = brd[:1200]
+    if test_cases:
+        context += "\n\n--- TEST CASES TO COVER ---\n" + test_cases
+
+    return f"""Generate a Moodle Behat feature (Gherkin) that exercises EACH test case for this requirement on a FRESH IOMAD test site, capturing one screenshot PER TEST CASE as evidence.
 
 REQUIREMENT: {title}
 
-CONTEXT (BRD excerpt):
-{(brd or '')[:2000]}
+CONTEXT (BRD excerpt + the test cases to cover):
+{context}
 
 STRICT RULES:
 - Output ONLY Gherkin, starting with `Feature:`. No prose, no code fences, no @tags (tags are added automatically).
-- The test site is EMPTY — no courses, users, or companies exist. Only the `admin` user exists. Do NOT reference data that wouldn't be there.
+- The test site is EMPTY — only the `admin` user exists; no courses, users, or companies. Do NOT reference data that wouldn't be there. If a test case needs data that cannot exist on an empty site, still navigate to the admin page most relevant to that case and capture a screenshot, so the case has evidence.
 - Use ONLY these steps (exact wording):
   - Given I log in as "admin"
   - And I am on site homepage
@@ -511,8 +522,10 @@ STRICT RULES:
   - Then I should see "<text>"
   - And I click on "<text>" "link"
   - And I press "<button>"
-- ONE Scenario, 4-8 steps. Navigate to the admin page most relevant to the requirement and `capture the screen` after each navigation.
-- Every scenario must include at least two `I capture the screen as` steps."""
+- Produce ONE Scenario PER TEST CASE listed above (both positive and negative). Title each Scenario after its test case.
+- Begin every Scenario with `Given I log in as "admin"` and keep it short (3-6 steps).
+- EACH Scenario MUST END with `And I capture the screen as "<short-name>"`, where <short-name> is a UNIQUE kebab-case slug of that test case (e.g. "tc1-footer-shows-full-name", "tc2-logged-out-no-footer"). This guarantees exactly one screenshot per test case.
+- If there are more than 12 test cases, cover the first 12."""
 
 
 @app.route("/test-evidence", methods=["POST"])
@@ -560,6 +573,7 @@ def test_evidence():
     status = "PASS" if result.get("passed") else "needs review"
     body = f"## Test Evidence — live IOMAD run\n\n**Result:** {status} — {result.get('summary', '')}\n\n"
     if links:
+        body += f"**Screenshots:** {len(links)} (one per test case, where reachable)\n\n"
         for name_, url in links:
             body += f"**{name_}**\n\n![{name_}]({url})\n\n"
     else:
