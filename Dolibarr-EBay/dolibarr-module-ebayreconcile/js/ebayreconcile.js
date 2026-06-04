@@ -125,6 +125,22 @@
         return main + '<span class="ebr-breakdown">' + parts.join('<span class="bd-sep">·</span>') + '</span>';
     }
 
+    function typeCell(r) {
+        var ty = r.ebay_type || (r.ebay_types || []).join(', ');
+        if (!ty) return '<span class="ebr-sub">-</span>';
+        var cls = /refund/i.test(ty) ? 'ebr-type-refund' : 'ebr-type-other';
+        return '<span class="ebr-typebadge ' + cls + '">' + esc(ty) + '</span>';
+    }
+
+    // What document the action will create for this row: credit note for refunds,
+    // invoice otherwise. Backend sets suggested_action; fall back to has_refund.
+    function docTypeForRow(r) {
+        return r.suggested_action || (r.has_refund ? 'credit_note' : 'invoice');
+    }
+    function docLabel(r) {
+        return docTypeForRow(r) === 'credit_note' ? 'Create credit note' : 'Create invoice';
+    }
+
     function invoicesCell(r) {
         if (!r.invoices || r.invoices.length === 0) return '<span class="ebr-sub">-</span>';
         return r.invoices.map(function (i) {
@@ -162,13 +178,15 @@
 
         if (!state.writePerm) return '';
 
+        var isCN = docTypeForRow(r) === 'credit_note';
+        var icon = isCN ? 'fa-file-invoice-dollar' : 'fa-file-invoice';
         if (r.status === 'MISMATCH') {
             var target = pickLargestInvoice(r);
             if (!target) return '<span class="ebr-sub">no parent</span>';
-            return '<button class="button" data-approve="' + esc(r.order_number) + '"><i class="fa fa-check"></i> Approve</button>';
+            return '<button class="button" data-approve="' + esc(r.order_number) + '"><i class="fa ' + icon + '"></i> ' + docLabel(r) + '</button>';
         }
         if (r.status === 'MISSING_IN_DOLIBARR' || r.status === 'NO_LINKED_INVOICES') {
-            return '<button class="button" data-create="' + esc(r.order_number) + '"><i class="fa fa-file-invoice"></i> Create invoice</button>';
+            return '<button class="button" data-create="' + esc(r.order_number) + '"><i class="fa ' + icon + '"></i> ' + docLabel(r) + '</button>';
         }
         return '';
     }
@@ -226,13 +244,9 @@
         });
     }
     function approveActionForRow(r) {
-        var diff = Number(r.diff || 0);
-        // Refund-led rows use diff = ebay + dolibarr, so the correction
-        // direction is inverted compared with normal sale rows.
-        if (r.has_refund && Number(r.ebay_net || 0) < 0) {
-            return diff < 0 ? 'invoice' : 'credit_note';
-        }
-        return diff < 0 ? 'credit_note' : 'invoice';
+        // The correcting document follows the eBay transaction type, not the diff
+        // sign: a refund issues a credit note, everything else an invoice.
+        return docTypeForRow(r);
     }
     function recalcRowAfterAdjustment(row, action, newInvoiceId, newInvoiceRef, amount, signedAmountOverride) {
         if (!row) return;
@@ -251,9 +265,8 @@
         row.dolibarr_net = Number(row.dolibarr_net || 0) + signedAmount;
         var ebay = Number(row.ebay_net || 0);
         var dol = Number(row.dolibarr_net || 0);
-        var nextDiff = row.has_refund && ebay < 0
-            ? Number((ebay + dol).toFixed(2))
-            : Number((ebay - dol).toFixed(2));
+        // Consistent with the backend: diff is always eBay - Dolibarr.
+        var nextDiff = Number((ebay - dol).toFixed(2));
         row.diff = nextDiff;
         if (Math.abs(nextDiff) <= 0.01) {
             row.status = 'MATCH';
@@ -319,6 +332,7 @@
                 return '<tr class="' + (i % 2 === 0 ? 'pair' : 'impair') + '">'
                     + '<td><span class="ebr-badge ' + r.status + '">' + r.status.replace(/_/g, ' ') + '</span></td>'
                     + '<td><strong>' + esc(r.order_number) + '</strong></td>'
+                    + '<td>' + typeCell(r) + '</td>'
                     + '<td class="num">' + ebayNetCell(r) + '</td>'
                     + '<td class="num">' + fmt(r.dolibarr_net) + '</td>'
                     + '<td class="num">' + diffCell(r.diff) + '</td>'
@@ -358,7 +372,7 @@
             bulkC.hidden = !state.writePerm;
             bulkC.disabled = nc === 0;
             bulkC.classList.toggle('ebr-bulk-disabled', nc === 0);
-            bulkC.textContent = 'Create all invoices (' + nc + ')';
+            bulkC.textContent = 'Create all documents (' + nc + ')';
         }
         var bulkP = document.getElementById('ebrBulkPay');
         if (bulkP) {
@@ -483,23 +497,33 @@
             ? r.ebay_lines
             : [{ date:'', type:'eBay sale', description: r.order_number, net: r.ebay_net }];
 
+        var docType = docTypeForRow(r);
+        var isCN = docType === 'credit_note';
+
         state.pendingCreate = {
             orderNumber: r.order_number,
             ebayNet: r.ebay_net,
             lines: lines,
             parentSoId: hasSO ? r.dolibarr_order_id : null,
+            action: docType,
             note: r.notes || '',
         };
 
         var modal = ensureModal('ebrCreateModal',
             '<div class="ebr-modal" style="width:520px;">'
-            + '<div class="mhead"><i class="fa fa-file-invoice"></i> Create missing invoice</div>'
+            + '<div class="mhead" id="ebrCreateHead"></div>'
             + '<div class="mbody"><dl id="ebrCreateBody"></dl>'
-            + '<div class="mnote">Confirm will create the invoice in Dolibarr (one line per CSV row), then validate it.</div>'
+            + '<div class="mnote" id="ebrCreateNote"></div>'
             + '<div id="ebrCreateErr" class="ebr-error" hidden></div></div>'
             + '<div class="mfoot"><button class="button" id="ebrCreateCancel">Cancel</button>'
             + '<button class="butAction" id="ebrCreateConfirm">Confirm</button></div>'
             + '</div>');
+        document.getElementById('ebrCreateHead').innerHTML = isCN
+            ? '<i class="fa fa-file-invoice-dollar"></i> Create credit note'
+            : '<i class="fa fa-file-invoice"></i> Create missing invoice';
+        document.getElementById('ebrCreateNote').textContent = isCN
+            ? 'Confirm will create a credit note in Dolibarr (positive amount, issued to eBay — not applied to a source invoice), then validate it.'
+            : 'Confirm will create the invoice in Dolibarr (one line per CSV row), then validate it.';
 
         var linesHtml = lines.map(function (l) {
             var n = Number(l.net || 0);
@@ -510,13 +534,17 @@
                 + '</div>';
         }).join('');
 
+        var willCreate = isCN
+            ? '<strong style="color:#b3261e">Credit note</strong> for <strong>' + Math.abs(Number(r.ebay_net || 0)).toFixed(2) + '</strong>'
+            : '<strong style="color:#1e8a4a">Invoice</strong> for <strong>' + fmt(r.ebay_net) + '</strong>';
         document.getElementById('ebrCreateBody').innerHTML =
             '<dt>Order</dt><dd><code>' + esc(r.order_number) + '</code></dd>' +
             '<dt>Status</dt><dd>' + r.status.replace(/_/g, ' ') + '</dd>' +
+            '<dt>eBay type</dt><dd>' + esc(r.ebay_type || (r.ebay_types || []).join(', ') || '-') + '</dd>' +
             (hasSO
                 ? '<dt>Linking to SO</dt><dd><code>' + esc(r.dolibarr_order_ref) + '</code></dd>'
                 : '<dt>Customer</dt><dd>default eBay customer</dd>') +
-            '<dt>Total</dt><dd><strong>' + fmt(r.ebay_net) + '</strong></dd>' +
+            '<dt>Will create</dt><dd>' + willCreate + '</dd>' +
             '<dt>Lines (' + lines.length + ')</dt><dd><div style="max-height:140px;overflow:auto;">' + linesHtml + '</div></dd>';
 
         var confirmBtn = document.getElementById('ebrCreateConfirm');
@@ -536,14 +564,17 @@
             if (!data.ok) throw new Error(data.error || 'n8n returned ok=false');
             var target = state.results.find(function (x) { return x.order_number === state.pendingCreate.orderNumber; });
             if (target) {
+                var act = data.action || 'invoice';
                 target._adjusted = {
-                    action: 'invoice',
+                    action: act,
                     newInvoiceId: data.newInvoiceId,
                     newInvoiceRef: data.newInvoiceRef,
                     applied: false,
                     dolibarrEditUrl: data.dolibarrEditUrl,
                 };
-                recalcRowAfterAdjustment(target, 'invoice', data.newInvoiceId, data.newInvoiceRef, data.totalHt, data.totalHt);
+                // Credit notes reduce the Dolibarr-side net (negative); invoices keep their sign.
+                var signed = act === 'credit_note' ? -Math.abs(Number(data.totalHt || 0)) : Number(data.totalHt || 0);
+                recalcRowAfterAdjustment(target, act, data.newInvoiceId, data.newInvoiceRef, Math.abs(Number(data.totalHt || 0)), signed);
             }
             showToast(data.message + ' <a href="' + data.dolibarrEditUrl + '" target="_blank">Open</a>', false);
             document.getElementById('ebrCreateModal').classList.remove('open');
@@ -611,12 +642,13 @@
                     ebayNet: r.ebay_net,
                     lines: lines,
                     parentSoId: hasSO ? r.dolibarr_order_id : null,
+                    action: docTypeForRow(r),
                     note: r.notes || '',
                 },
             };
         });
         if (!elig.length) return;
-        if (!confirm('Create ' + elig.length + ' invoice(s)?')) return;
+        if (!confirm('Create ' + elig.length + ' document(s)?')) return;
         showToast('Creating ' + elig.length + ' invoice(s)...', false);
         var ok = 0, fail = 0;
         var cursor = 0;
@@ -628,7 +660,7 @@
                     jpost('create_invoice', item.payload).then(function (data) {
                         if (data && data.ok) {
                             item.row._adjusted = {
-                                action: 'invoice',
+                                action: data.action || 'invoice',
                                 newInvoiceId: data.newInvoiceId,
                                 newInvoiceRef: data.newInvoiceRef,
                                 applied: false,
@@ -916,7 +948,7 @@
     if (dlJson) dlJson.addEventListener('click', downloadJson);
 
     function downloadCsv() {
-        var cols = ["status","order_number","ebay_net","dolibarr_net","diff","dolibarr_order_ref","dolibarr_order_id","invoice_count","invoice_refs","invoice_amounts","notes"];
+        var cols = ["status","order_number","ebay_type","ebay_net","dolibarr_net","diff","dolibarr_order_ref","dolibarr_order_id","invoice_count","invoice_refs","invoice_amounts","notes"];
         function escCell(v) {
             if (v === null || v === undefined) return '';
             var s = String(v);
@@ -928,6 +960,7 @@
             lines.push([
                 r.status,
                 r.order_number,
+                r.ebay_type || (r.ebay_types || []).join(' / '),
                 fmt(r.ebay_net),
                 fmt(r.dolibarr_net),
                 fmt(r.diff),

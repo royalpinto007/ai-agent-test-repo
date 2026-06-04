@@ -146,6 +146,10 @@ function doCreateInvoice($body, $resultByOrder)
     $parentSoId  = isset($body['parentSoId']) ? (int) $body['parentSoId'] : 0;
     $lines       = isset($body['lines']) ? $body['lines'] : array();
     $userNote    = isset($body['note']) ? trim((string) $body['note']) : '';
+    // Refund-type rows create a credit note (positive amount), not a negative
+    // invoice. Everything else stays a standard invoice.
+    $kind        = (isset($body['action']) && $body['action'] === 'credit_note') ? 'credit_note' : 'invoice';
+    $isCN        = ($kind === 'credit_note');
     if (!$orderNumber) throw new Exception('orderNumber is required');
     if (empty($lines) || !is_array($lines)) {
         // Fallback: pull from session lastRun
@@ -171,12 +175,15 @@ function doCreateInvoice($body, $resultByOrder)
 
     $inv = new Facture($db);
     $inv->socid           = $socid;
-    $inv->type            = Facture::TYPE_STANDARD;
+    $inv->type            = $isCN ? Facture::TYPE_CREDIT_NOTE : Facture::TYPE_STANDARD;
     $inv->ref_client      = $orderNumber;
     $inv->date            = dol_now();
-    $inv->note_private    = "Auto-created via eBay reconciliation. eBay order: $orderNumber.".($parentSoRef ? " Linked to SO $parentSoRef (id $parentSoId)." : ' No SO existed; using default eBay customer.');
+    $docWord = $isCN ? 'credit note' : 'invoice';
+    $inv->note_private    = "Auto-created via eBay reconciliation ($docWord). eBay order: $orderNumber.".($parentSoRef ? " Linked to SO $parentSoRef (id $parentSoId)." : ' No SO existed; using default eBay customer.');
     if ($userNote !== '') $inv->note_private .= "\nUser note: ".$userNote;
-    if ($parentSoId > 0) {
+    // Only standard invoices carry the SO origin link; a standalone credit note
+    // is issued to eBay without being applied to a source invoice.
+    if ($parentSoId > 0 && !$isCN) {
         $inv->origin       = 'commande';
         $inv->origin_id    = $parentSoId;
     }
@@ -184,7 +191,10 @@ function doCreateInvoice($body, $resultByOrder)
     foreach ($lines as $l) {
         $desc = '['.($l['type'] ?? 'eBay').'] '.($l['description'] ?? '').' ('.($l['date'] ?? '').')';
         $desc = trim(preg_replace('/\s+\(\)/', '', $desc));
-        $inv->lines[] = makeLine($desc, 1, (float) ($l['net'] ?? 0));
+        // Credit notes take positive amounts (the document type carries the sign);
+        // a refund's negative net therefore becomes a positive credit-note line.
+        $amt = (float) ($l['net'] ?? 0);
+        $inv->lines[] = makeLine($desc, 1, $isCN ? abs($amt) : $amt);
     }
 
     $newId = $inv->create($user);
@@ -193,6 +203,7 @@ function doCreateInvoice($body, $resultByOrder)
 
     return array(
         'ok'              => true,
+        'action'          => $kind,
         'mode'            => $parentSoId ? 'from_so' : 'standalone',
         'orderNumber'     => $orderNumber,
         'newInvoiceId'    => (string) $newId,
@@ -202,9 +213,11 @@ function doCreateInvoice($body, $resultByOrder)
         'so'              => $parentSoId ? array('id' => $parentSoId, 'ref' => $parentSoRef, 'socid' => $socid) : null,
         'validated'       => true,
         'dolibarrEditUrl' => DOL_URL_ROOT.'/compta/facture/card.php?id='.(int)$newId,
-        'message'         => $parentSoId
-            ? "Created and validated invoice ".$inv->ref." linked to SO $parentSoRef."
-            : "Created and validated invoice ".$inv->ref." under customer $socid (no SO).",
+        'message'         => $isCN
+            ? "Created and validated credit note ".$inv->ref." for ".number_format($inv->total_ht, 2).($parentSoRef ? " (order $orderNumber, SO $parentSoRef)." : " (order $orderNumber, no SO).")
+            : ($parentSoId
+                ? "Created and validated invoice ".$inv->ref." linked to SO $parentSoRef."
+                : "Created and validated invoice ".$inv->ref." under customer $socid (no SO)."),
     );
 }
 

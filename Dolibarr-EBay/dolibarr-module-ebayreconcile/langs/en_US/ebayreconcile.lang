@@ -34,6 +34,7 @@ StatusNO_LINKED_INVOICES=No invoices
 # Table columns
 ColStatus=Status
 ColOrderNumber=Order number
+ColEbayType=Type
 ColEbayNet=eBay net
 ColDolibarrNet=Dolibarr net
 ColDiff=Diff
@@ -53,10 +54,10 @@ EditNote=Edit note
 AddNote=Add note
 SaveNote=Save note
 ReconcileHelpTitle=How mismatch resolution works
-ReconcileHelpPoint1=Review the Diff column first. A positive Diff means Dolibarr is short and the tool will create an additional invoice for that amount.
-ReconcileHelpPoint2=A negative Diff means Dolibarr is high and the tool will create a credit note for the absolute value of that amount.
+ReconcileHelpPoint1=Diff is always eBay net minus the Dolibarr amount due. The Type column shows the eBay transaction type (Order, Refund, Shipping label, Other fee).
+ReconcileHelpPoint2=The action creates the document that matches the eBay type: Refund rows create a credit note (positive amount, issued to eBay); all other types create an invoice. The button label tells you which.
 ReconcileHelpPoint3=Use the Notes column to add an optional internal note for that row. The note is saved with the current reconcile session and included on created Dolibarr documents.
-ReconcileHelpPoint4=Refund-led rows are compared differently: the negative eBay refund net is added to the Dolibarr net. Regular sale rows still use eBay net minus Dolibarr net.
+ReconcileHelpPoint4=A cancelled sales order whose refund and order net to zero is treated as a Match (nothing to post) rather than offering to create a document.
 
 # Actions
 Approve=Approve

@@ -184,13 +184,19 @@ class EbayReconciler
     protected function reconcileOneOrder($orderNumber, $g)
     {
         $hasRefund = $this->groupHasRefund($g);
+        // The correcting document type follows the eBay transaction type:
+        // a refund issues a credit note; everything else (Order, Shipping label,
+        // Other fee, ...) is recorded as an invoice.
+        $suggestedAction = $hasRefund ? 'credit_note' : 'invoice';
         $base = array(
-            'order_number' => $orderNumber,
-            'ebay_net'     => $g['ebayNet'],
-            'ebay_rows'    => $g['rows'],
-            'ebay_types'   => $g['types'],
-            'ebay_lines'   => $g['lines'],
-            'has_refund'   => $hasRefund,
+            'order_number'     => $orderNumber,
+            'ebay_net'         => $g['ebayNet'],
+            'ebay_rows'        => $g['rows'],
+            'ebay_types'       => $g['types'],
+            'ebay_type'        => $this->primaryType($g['types'], $hasRefund),
+            'ebay_lines'       => $g['lines'],
+            'has_refund'       => $hasRefund,
+            'suggested_action' => $suggestedAction,
         );
 
         // 1. Find the SO by ref_client.
@@ -254,8 +260,16 @@ class EbayReconciler
         $diff = round($g['ebayNet'] - $dolNet, 2);
 
         if (count($invoices) === 0) {
-            $status = 'NO_LINKED_INVOICES';
-            $notes  = 'Sales order ' . $so['ref'] . ' has no linked invoices/credit notes';
+            if (isset($so['statut']) && (int) $so['statut'] === -1) {
+                // Cancelled SO (Commande::STATUS_CANCELED): the eBay refund+order
+                // net to ~0 and there's nothing in Dolibarr to post against —
+                // treat as reconciled rather than offering to create a document.
+                $status = 'MATCH';
+                $notes  = 'Cancelled SO ' . $so['ref'] . ' — nothing to post.';
+            } else {
+                $status = 'NO_LINKED_INVOICES';
+                $notes  = 'Sales order ' . $so['ref'] . ' has no linked invoices/credit notes';
+            }
         } elseif (abs($diff) > $this->matchTolerance) {
             $status = 'MISMATCH';
             $notes  = '';
@@ -291,12 +305,30 @@ class EbayReconciler
     }
 
     /**
+     * A short label of the eBay transaction type(s) in this group, for display
+     * (CSV "Type" column: Order / Refund / Shipping label / Other fee). Refund
+     * wins when present since it drives the credit-note handling.
+     */
+    protected function primaryType($types, $hasRefund)
+    {
+        if ($hasRefund) return 'Refund';
+        $types = array_values(array_filter((array) $types, function ($t) { return trim((string) $t) !== ''; }));
+        if (empty($types)) return '';
+        foreach (array('Shipping label', 'Other fee', 'Order') as $pref) {
+            foreach ($types as $t) {
+                if (strcasecmp(trim((string) $t), $pref) === 0) return $pref;
+            }
+        }
+        return implode(', ', $types);
+    }
+
+    /**
      * Find SO with ref_client exactly = $orderNumber.
      * Returns ['id'=>..., 'ref'=>..., 'socid'=>...] or null.
      */
     public function findSalesOrder($orderNumber)
     {
-        $sql = "SELECT rowid, ref, fk_soc FROM " . MAIN_DB_PREFIX . "commande";
+        $sql = "SELECT rowid, ref, fk_soc, fk_statut FROM " . MAIN_DB_PREFIX . "commande";
         $sql .= " WHERE ref_client = '" . $this->db->escape($orderNumber) . "'";
         $sql .= " AND entity IN (" . getEntity('commande') . ")";
         $sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -305,9 +337,10 @@ class EbayReconciler
         if ($this->db->num_rows($res) === 0) return null;
         $obj = $this->db->fetch_object($res);
         return array(
-            'id'    => (int) $obj->rowid,
-            'ref'   => $obj->ref,
-            'socid' => (int) $obj->fk_soc,
+            'id'     => (int) $obj->rowid,
+            'ref'    => $obj->ref,
+            'socid'  => (int) $obj->fk_soc,
+            'statut' => (int) $obj->fk_statut,   // -1 = cancelled (Commande::STATUS_CANCELED)
         );
     }
 

@@ -162,6 +162,7 @@ if ($reconcileResult) {
     print '<thead><tr class="liste_titre">';
     print '<th data-key="status">'.$langs->trans("ColStatus").'</th>';
     print '<th data-key="order_number">'.$langs->trans("ColOrderNumber").'</th>';
+    print '<th data-key="ebay_type">'.$langs->trans("ColEbayType").'</th>';
     print '<th data-key="ebay_net" class="num">'.$langs->trans("ColEbayNet").'</th>';
     print '<th data-key="dolibarr_net" class="num">'.$langs->trans("ColDolibarrNet").'</th>';
     print '<th data-key="diff" class="num">'.$langs->trans("ColDiff").'</th>';
