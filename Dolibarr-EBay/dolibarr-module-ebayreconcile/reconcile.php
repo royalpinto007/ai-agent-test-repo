@@ -51,7 +51,10 @@ if ($action === 'reconcile' && !empty($_FILES['payoutcsv']['tmp_name'])) {
 // Header — uses Dolibarr's standard chrome
 llxHeader('', $langs->trans("ReconcilePageTitle"), '');
 
-print '<link rel="stylesheet" href="'.dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 1).'" />';
+// Cache-bust assets by file mtime so a redeploy always reloads them (avoids a
+// stale cached JS rendering against newer server HTML — e.g. a shifted table).
+$ebrCssV = (int) @filemtime(dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 0));
+print '<link rel="stylesheet" href="'.dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 1).'?v='.$ebrCssV.'" />';
 
 // Topbar (Dolibarr's print_fiche_titre is the canonical h1 here)
 print load_fiche_titre($langs->trans("ReconcilePageTitle"), '', 'bank_account');
@@ -209,7 +212,8 @@ print '<script>window.EBR_UPLOAD_I18N = '.json_encode(array(
 )).';</script>';
 
 // JS for filters / sorting / bulk + per-row actions
-print '<script src="'.dol_buildpath('/ebayreconcile/js/ebayreconcile.js', 1).'"></script>';
+$ebrJsV = (int) @filemtime(dol_buildpath('/ebayreconcile/js/ebayreconcile.js', 0));
+print '<script src="'.dol_buildpath('/ebayreconcile/js/ebayreconcile.js', 1).'?v='.$ebrJsV.'"></script>';
 
 llxFooter();
 $db->close();

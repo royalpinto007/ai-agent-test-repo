@@ -14,7 +14,8 @@ $langs->loadLangs(array('ebayreconcile@ebayreconcile', 'main'));
 if (empty($user->rights->ebayreconcile->use)) accessforbidden();
 
 llxHeader('', $langs->trans("HistoryPageTitle"), '');
-print '<link rel="stylesheet" href="'.dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 1).'" />';
+$ebrCssV = (int) @filemtime(dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 0));
+print '<link rel="stylesheet" href="'.dol_buildpath('/ebayreconcile/css/ebayreconcile.css', 1).'?v='.$ebrCssV.'" />';
 print load_fiche_titre($langs->trans("HistoryPageTitle"), '', 'bank_account');
 
 $sql = "SELECT rowid, payout_id, payout_date, payout_method, csv_filename, orders_count, payments_count, total_paid, settled_at, settled_by, summary_json";
