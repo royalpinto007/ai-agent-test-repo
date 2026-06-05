@@ -114,7 +114,9 @@
     function ebayNetCell(r) {
         var main = fmt(r.ebay_net);
         var lines = r.ebay_lines || [];
-        if (lines.length <= 1) return main;
+        // Always show the per-line breakdown with the eBay Type (CSV column B) so
+        // the user sees how every line was coded by eBay — including single-line rows.
+        if (lines.length === 0) return main;
         var parts = lines.map(function (l) {
             var n = Number(l.net);
             var cls = n > 0 ? "bd-pos" : (n < 0 ? "bd-neg" : "");
@@ -153,6 +155,9 @@
 
     function actionCell(r) {
         var parts = [];
+        if (r._excluded) {
+            return '<span class="ebr-actiontag"><i class="fa fa-ban"></i> excluded</span>';
+        }
         if (r._adjusted) {
             var a = r._adjusted;
             var label = a.action === 'credit_note' ? 'CN' : 'INV';
@@ -186,6 +191,12 @@
             return '<button class="button" data-approve="' + esc(r.order_number) + '"><i class="fa ' + icon + '"></i> ' + docLabel(r) + '</button>';
         }
         if (r.status === 'MISSING_IN_DOLIBARR' || r.status === 'NO_LINKED_INVOICES') {
+            // Zero dollar impact (e.g. a refund that washes against its order, or a
+            // cancelled order) — nothing to post. Offer Exclude instead of creating
+            // a document; only allowed because it can't create a balance issue.
+            if (Math.abs(Number(r.diff || 0)) <= 0.01) {
+                return '<button class="button" data-exclude="' + esc(r.order_number) + '"><i class="fa fa-ban"></i> Exclude</button>';
+            }
             return '<button class="button" data-create="' + esc(r.order_number) + '"><i class="fa ' + icon + '"></i> ' + docLabel(r) + '</button>';
         }
         return '';
@@ -234,8 +245,8 @@
     function unresolvedRows() {
         return state.results.filter(function (r) {
             return (r.status === 'MISMATCH' && !r._adjusted)
-                || r.status === 'MISSING_IN_DOLIBARR' && !r._adjusted
-                || r.status === 'NO_LINKED_INVOICES' && !r._adjusted;
+                || (r.status === 'MISSING_IN_DOLIBARR' && !r._adjusted && !r._excluded)
+                || (r.status === 'NO_LINKED_INVOICES' && !r._adjusted && !r._excluded);
         });
     }
     function hasPayableInvoice(r) {
@@ -288,7 +299,8 @@
     function eligibleCreates() {
         return state.results.filter(function (r) {
             return (r.status === 'MISSING_IN_DOLIBARR' || r.status === 'NO_LINKED_INVOICES')
-                && !r._adjusted;
+                && !r._adjusted && !r._excluded
+                && Math.abs(Number(r.diff || 0)) > 0.01;  // zero-impact rows are Exclude-only, not Create
         });
     }
 
@@ -876,6 +888,21 @@
         if (ap) { e.preventDefault(); openApproveModal(ap.dataset.approve); return; }
         var cr = e.target.closest('[data-create]');
         if (cr) { e.preventDefault(); openCreateInvoiceModal(cr.dataset.create); return; }
+        var ex = e.target.closest('[data-exclude]');
+        if (ex) {
+            e.preventDefault();
+            var rowEx = state.results.find(function (x) { return x.order_number === ex.dataset.exclude; });
+            if (!rowEx) return;
+            // Guard: never let an exclude hide a real balance.
+            if (Math.abs(Number(rowEx.diff || 0)) > 0.01) {
+                showToast('Cannot exclude — this line has a non-zero balance (' + fmt(rowEx.diff) + '). Resolve it instead.', true);
+                return;
+            }
+            rowEx._excluded = { at: 'manual' };
+            showToast('Excluded ' + esc(rowEx.order_number) + ' (zero balance — nothing to post).', false);
+            render();
+            return;
+        }
         var noteEdit = e.target.closest('[data-note-edit]');
         if (noteEdit) {
             var rowEdit = state.results.find(function (x) { return x.order_number === noteEdit.dataset.noteEdit; });
