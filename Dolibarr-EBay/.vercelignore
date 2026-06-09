@@ -1,6 +1,0 @@
-__pycache__/
-venv/
-*.pyc
-.~lock.*
-reconcile-report.csv
-eBay Payout_*.csv
