@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify
 
 from shared.session import load_session, save_session
 from shared.config import get_repo_config
+from shared.claude import ClaudeUsageLimitError
 import agents.ba.agent as ba
 import agents.sa.agent as sa
 import agents.pm.agent as pm
@@ -60,6 +61,44 @@ def _repo_config(data, session):
             return cfg.get("repo_path", DEFAULT_REPO_PATH), cfg.get("test_command"), cfg.get("main_branch", "main")
     repo_path = data.get("repo_path") or session.get("repo_path") or DEFAULT_REPO_PATH
     return repo_path, session.get("test_command"), "main"
+
+
+def _agent_failure(e):
+    """Standard error response for an agent endpoint.
+
+    Claude usage-limit errors are re-raised so the app-level errorhandler can post
+    a clear "try again after the reset" comment and return 503; everything else
+    becomes a generic 500.
+    """
+    if isinstance(e, ClaudeUsageLimitError):
+        raise e
+    return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.errorhandler(ClaudeUsageLimitError)
+def _handle_usage_limit(e):
+    """When Claude's usage limit is exhausted, post a clear comment on the issue so
+    it's obvious what happened and when to retry — instead of a cryptic 500."""
+    data = request.get_json(silent=True) or {}
+    session = load_session(_sid(data)) or {}
+    owner = data.get("owner") or session.get("owner", "")
+    repo = data.get("repo") or session.get("repo", "")
+    issue_number = data.get("issue_number") or session.get("issue_number")
+    token = os.environ.get("GITHUB_TOKEN", "")
+    stage = (request.path or "").lstrip("/").replace("-agent", "").replace("-", " ") or None
+    if owner and repo and issue_number and token:
+        try:
+            from shared.utils import post_github_comment
+            post_github_comment(owner, repo, issue_number, e.comment_body(stage), token)
+        except Exception:
+            pass
+    return jsonify({
+        "status": "rate_limited",
+        "stage": stage,
+        "message": e.user_message,
+        "retry_after_seconds": e.wait_seconds,
+        "reset_at": e.reset_at_str,
+    }), 503
 
 
 @app.route("/repos", methods=["GET"])
@@ -127,7 +166,7 @@ def ba_agent():
         })
         return jsonify({"status": "success", "stage": "ba", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/sa-agent", methods=["POST"])
@@ -144,7 +183,7 @@ def sa_agent():
         )
         return jsonify({"status": "success", "stage": "sa", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/pm-agent", methods=["POST"])
@@ -167,7 +206,7 @@ def pm_agent():
         )
         return jsonify({"status": "success", "stage": "pm", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/dev-agent", methods=["POST"])
@@ -190,7 +229,7 @@ def dev_agent():
         )
         return jsonify({"status": "success", "stage": "dev", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/security-agent", methods=["POST"])
@@ -209,7 +248,7 @@ def security_agent():
         )
         return jsonify({"status": "success", "stage": "security", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/review-agent", methods=["POST"])
@@ -231,7 +270,7 @@ def review_agent():
         )
         return jsonify({"status": "success", "stage": "review", "session_id": sid, "awaiting_approval": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/qa-agent", methods=["POST"])
@@ -251,7 +290,7 @@ def qa_agent():
         )
         return jsonify({"status": "success", "stage": "qa", "session_id": sid, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/deploy-agent", methods=["POST"])
@@ -265,7 +304,7 @@ def deploy_agent():
         result = deploy.run(session_id=sid, env=env, repo_path=repo_path)
         return jsonify({"status": "success", "stage": f"deploy-{env}", "session_id": sid, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/metrics", methods=["GET"])
@@ -321,7 +360,7 @@ def create_pr():
         save_session(sid, {"pr_url": pr_url})
         return jsonify({"status": "success", "pr_url": pr_url, "branch": branch_name})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/reopen", methods=["POST"])
@@ -341,7 +380,7 @@ def reopen():
         )
         return jsonify({"status": "success", "stage": "ba", "session_id": sid, "reopened": True, **result})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return _agent_failure(e)
 
 
 @app.route("/skip-qa", methods=["POST"])

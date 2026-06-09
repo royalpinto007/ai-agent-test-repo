@@ -3,12 +3,59 @@ import os
 import re
 import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 log = logging.getLogger(__name__)
 
 RESET_BUFFER_SECONDS = 30
 MAX_RETRIES = 1
+# Above this, don't block the request waiting for the limit to reset (a usage-limit
+# window can be hours). Surface a ClaudeUsageLimitError so the caller can post a
+# clear "try again after the reset" comment instead of hanging.
+MAX_BLOCKING_WAIT_SECONDS = 300
+
+
+class ClaudeUsageLimitError(RuntimeError):
+    """Raised when Claude's usage/rate limit is hit and we won't keep waiting.
+
+    Carries how long until reset so callers can tell the user when to retry.
+    """
+
+    def __init__(self, wait_seconds, raw_stderr=""):
+        self.wait_seconds = max(0, int(wait_seconds or 0))
+        self.raw_stderr = raw_stderr
+        super().__init__(self.user_message)
+
+    @property
+    def reset_at_str(self):
+        reset = datetime.now(timezone.utc).astimezone() + timedelta(seconds=self.wait_seconds)
+        return reset.strftime("%-I:%M %p on %b %-d")
+
+    @property
+    def _hours(self):
+        return max(1, round(self.wait_seconds / 3600)) if self.wait_seconds >= 1800 else None
+
+    @property
+    def reset_clause(self):
+        if self.wait_seconds <= 0:
+            return "Please try again later."
+        if self._hours:
+            window = f"about {self._hours}h"
+        else:
+            window = f"about {max(1, round(self.wait_seconds / 60))} min"
+        return (f"Limits reset in {window} (around {self.reset_at_str}). "
+                f"Please re-trigger this step after the reset.")
+
+    @property
+    def user_message(self):
+        return f"Claude usage limit reached. {self.reset_clause}"
+
+    def comment_body(self, stage=None):
+        where = f" at the **{stage}** step" if stage else ""
+        return (f"⏳ **Claude usage limit reached.**\n\n"
+                f"The pipeline paused{where} because the account's Claude usage limit is "
+                f"currently exhausted. {self.reset_clause}\n\n"
+                f"_No work was lost — re-run this step once the limit resets._")
 
 # Optional model override. Set CLAUDE_MODEL in the environment (e.g. in
 # /etc/sdlc-agent/env) to pin a specific model — e.g. "haiku" for a lighter,
@@ -83,15 +130,21 @@ def ask_claude(prompt):
 
         stderr = result.stderr.strip()
         wait_seconds = _parse_reset_seconds(stderr + " " + result.stdout)
-        if wait_seconds is not None and attempts < MAX_RETRIES:
-            sleep_for = wait_seconds + RESET_BUFFER_SECONDS
-            log.warning(
-                "Claude usage limit hit. Sleeping %ds (until reset + %ds buffer) before retry.",
-                sleep_for,
-                RESET_BUFFER_SECONDS,
-            )
-            time.sleep(sleep_for)
-            attempts += 1
-            continue
+        if wait_seconds is not None:
+            # Short, transient throttle: wait it out once, then retry.
+            if wait_seconds <= MAX_BLOCKING_WAIT_SECONDS and attempts < MAX_RETRIES:
+                sleep_for = wait_seconds + RESET_BUFFER_SECONDS
+                log.warning(
+                    "Claude rate limit hit. Sleeping %ds (until reset + %ds buffer) before retry.",
+                    sleep_for,
+                    RESET_BUFFER_SECONDS,
+                )
+                time.sleep(sleep_for)
+                attempts += 1
+                continue
+            # Long usage-limit window (hours) or retries exhausted: don't block the
+            # request — surface a typed error so the caller can post a clear comment.
+            log.warning("Claude usage limit reached; reset in ~%ds. Not blocking.", wait_seconds)
+            raise ClaudeUsageLimitError(wait_seconds, raw_stderr=stderr)
 
         raise RuntimeError(f"claude exited {result.returncode}: {stderr}")
