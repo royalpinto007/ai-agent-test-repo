@@ -19,6 +19,26 @@ import agents.deploy.agent as deploy
 
 app = Flask(__name__)
 
+
+@app.before_request
+def _simulate_usage_limit_for_testing():
+    """Test/demo hook — OFF by default (no effect unless the env var is set).
+
+    Set SDLC_SIMULATE_LIMIT_STAGE to an endpoint path (e.g. "sa-agent" or
+    "dev-agent") and that stage will behave as if Claude's usage limit was hit:
+    it raises ClaudeUsageLimitError, which posts the "usage limit reached" comment
+    and returns 503. Lets us demo the flow on a real pipeline run without waiting
+    for an actual limit. Optionally append ":<seconds>" to set the reset window,
+    e.g. "sa-agent:18000". Unset the env (and restart) to return to normal.
+    """
+    cfg = os.environ.get("SDLC_SIMULATE_LIMIT_STAGE", "").strip().lstrip("/")
+    if not cfg:
+        return
+    stage, _, secs = cfg.partition(":")
+    if request.path.lstrip("/") == stage:
+        raise ClaudeUsageLimitError(int(secs) if secs.isdigit() else 5 * 3600)
+
+
 # Fallback repo path if no repos.json entry found
 DEFAULT_REPO_PATH = os.environ.get(
     "REPO_PATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
