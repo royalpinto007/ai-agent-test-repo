@@ -607,6 +607,28 @@ STRICT RULES:
 - If there are more than 12 test cases, cover the first 12."""
 
 
+def _ui_observable(title, brd):
+    """Quick yes/no gate: does this change produce a USER-OBSERVABLE difference
+    verifiable through the IOMAD web UI? Used to skip pointless live Behat runs
+    for comment/refactor/backend-only changes. Defaults to True on uncertainty."""
+    from shared.claude import ask_claude
+    prompt = f"""A change was made to a Moodle/IOMAD codebase. Decide whether it produces a USER-OBSERVABLE difference that a tester could verify by navigating the IOMAD web UI (a visible page, element, or behaviour change).
+
+TITLE: {title}
+REQUIREMENT / BRD (excerpt):
+{(brd or '')[:1500]}
+
+Answer with exactly one word:
+- yes — there is a visible UI/behaviour change someone could see and screenshot.
+- no  — purely internal (code comment, refactor, logging, backend/data, build/config) with nothing visible in the UI.
+If unsure, answer "yes". Output ONLY the one word."""
+    try:
+        ans = ask_claude(prompt).strip().lower()
+    except Exception:
+        return True
+    return not ans.startswith("no")
+
+
 @app.route("/test-evidence", methods=["POST"])
 def test_evidence():
     """Run a Behat feature on the live IOMAD test instance, upload the
@@ -620,14 +642,30 @@ def test_evidence():
     issue_number = data.get("issue_number") or session.get("issue_number")
     token = os.environ.get("GITHUB_TOKEN", "")
 
+    feature = data.get("feature") or session.get("test_feature")
+    force = bool(data.get("force"))
+    title = session.get("issue_title") or (session.get("requirement", "").split("\n")[0].strip()) or "the feature"
+
+    # Scale evidence to the change: skip the live UI run when there's nothing
+    # user-observable to screenshot (comments, refactors, backend-only). An
+    # explicit feature or force=true overrides the gate.
+    if not feature and not force and not _ui_observable(title, session.get("brd_draft", "")):
+        body = ("## Test Evidence — skipped\n\n"
+                "No live UI evidence applicable: this change has no user-observable behaviour "
+                "(e.g. a code comment, refactor, or backend-only change), so there is nothing to "
+                "screenshot on the IOMAD site. Correctness was checked by the unit tests at the Dev stage.\n\n"
+                "_Add `force` to run live evidence anyway._")
+        if token and owner and repo and issue_number:
+            from shared.utils import post_github_comment
+            post_github_comment(owner, repo, issue_number, body, token)
+        save_session(sid, {"test_evidence": {"skipped": True, "reason": "no user-observable UI change"}})
+        return jsonify({"status": "success", "skipped": True, "reason": "no user-observable UI change"})
+
     from shared.test_runner_client import run_behat_feature, runner_available
     if not runner_available():
         return jsonify({"status": "error", "message": "test runner unavailable (check TEST_RUNNER_URL / IOMAD-LIVE)"}), 503
-
-    feature = data.get("feature") or session.get("test_feature")
     if not feature:
         from shared.claude import ask_claude
-        title = session.get("issue_title") or (session.get("requirement", "").split("\n")[0].strip()) or "the feature"
         feature = ask_claude(_behat_gen_prompt(title, session.get("brd_draft", "")))
 
     result = run_behat_feature(feature, name=f"issue-{issue_number or 'adhoc'}")
