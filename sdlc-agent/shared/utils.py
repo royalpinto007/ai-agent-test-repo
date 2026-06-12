@@ -444,6 +444,33 @@ def grep_repo(repo_path, pattern, file_tree):
     return matches
 
 
+def grep_repo_fast(repo_path, keywords, includes=None, max_results=40):
+    """Find files whose contents match ANY of `keywords`, using system grep.
+
+    For large repos (e.g. Moodle core, ~20k files) Python-side per-file reading is
+    far too slow, so we shell out to a single recursive grep. Returns up to
+    `max_results` relative file paths. Best-effort: returns [] on any error or no
+    match, so callers can treat it as "nothing relevant found".
+    """
+    kws = [re.escape(k) for k in (keywords or []) if k and len(k) >= 4][:8]
+    if not kws:
+        return []
+    includes = includes or ["*.php", "*.js", "*.ts", "*.py", "*.html", "*.xml"]
+    cmd = ["grep", "-rIliE", "--exclude-dir=.git"]
+    cmd += ["--include=" + inc for inc in includes]
+    cmd += ["-e", "|".join(kws), repo_path]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except Exception:
+        return []
+    files = []
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if line:
+            files.append(os.path.relpath(line, repo_path))
+    return files[:max_results]
+
+
 def identify_relevant_files(issue_title, issue_description, repo_path, file_tree):
     file_tree_str = "\n".join(file_tree)
     prompt = f"""You are a senior developer. Given the task below and the file tree, list the files most likely to need changes.

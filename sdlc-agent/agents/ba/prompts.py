@@ -52,11 +52,13 @@ Recommendation: Option [A/B] — [one line reason]
 """
 
 
-def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=False):
+def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=False, live_config=""):
     """Single-call prompt that produces System Analysis + BRD together.
 
     ui_needed: when True, the BA also produces an HTML mockup of the proposed
     UI. Gated by the issue's 'UI mockup needed?' field to control token usage.
+    live_config: optional block of CURRENT live-instance settings read from the
+    running site; when present the BA must use it instead of guessing defaults.
     """
     files_section = "\n\n".join(
         f"FILE: {path}\n```\n{content}\n```"
@@ -64,6 +66,17 @@ def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=Fal
     )
     if not files_section.strip():
         files_section = "(no files were loaded — file tree may be empty or no files matched the requirement)"
+
+    live_section = ""
+    if live_config and live_config.strip():
+        live_section = f"""
+{live_config}
+
+Use the live config above as ground truth about the CURRENT state of the running site.
+- State the actual current setting(s) explicitly (don't say "depending on the active plugin" when the live config already tells you which one is active).
+- Base the Resolution Approach on what is really configured now, not on Moodle defaults.
+- Only raise an Open Question about a setting if it is NOT answered by the live config above.
+"""
 
     ui_section = ""
     if ui_needed:
@@ -83,7 +96,7 @@ A UI change was requested for this feature. Produce a single self-contained HTML
 {_STACK_DETECTION_RULES}
 
 REQUIREMENT: {requirement}
-
+{live_section}
 FILE TREE:
 {file_tree}
 
