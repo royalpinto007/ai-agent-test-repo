@@ -64,6 +64,38 @@ _PROSE_MARKERS = (
 )
 
 
+def _apply_edit(existing, search, replace):
+    """Apply a SEARCH/REPLACE edit. Tries exact match first, then a
+    whitespace-normalized line match (tolerant of the indentation/trailing-space
+    drift small models introduce) — but still requires the block to exist exactly
+    once, so it never edits the wrong place. Returns (new_content, reason)."""
+    if not search.strip():
+        return None, "empty SEARCH"
+    c = existing.count(search)
+    if c == 1:
+        return existing.replace(search, replace, 1), None
+    if c > 1:
+        return None, f"SEARCH not unique ({c} exact matches)"
+    # Normalized fallback: compare lines with leading/trailing whitespace removed.
+    ex_lines = existing.split("\n")
+    s_lines = [ln.strip() for ln in search.split("\n")]
+    while s_lines and s_lines[0] == "":
+        s_lines.pop(0)
+    while s_lines and s_lines[-1] == "":
+        s_lines.pop()
+    if not s_lines:
+        return None, "empty SEARCH after normalize"
+    hits = [i for i in range(len(ex_lines) - len(s_lines) + 1)
+            if [ex_lines[i + j].strip() for j in range(len(s_lines))] == s_lines]
+    if len(hits) == 1:
+        i = hits[0]
+        new_lines = ex_lines[:i] + replace.split("\n") + ex_lines[i + len(s_lines):]
+        return "\n".join(new_lines), None
+    if len(hits) > 1:
+        return None, f"SEARCH not unique ({len(hits)} normalized matches)"
+    return None, "SEARCH text not found"
+
+
 def _safe_to_write(repo_path, path, new_content):
     """Guard against the two destructive failure modes seen in practice:
     (1) the model writes prose ('No changes required...') as if it were the file;
@@ -213,6 +245,8 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         # Apply each op. Edits are surgical (exact SEARCH/REPLACE) so untouched
         # code is preserved by construction — no whole-file rewrites. New files
         # still pass the prose/empty guard.
+        log.warning("dev: parsed %d op(s): %s", len(file_ops),
+                    [(o["type"], o["path"]) for o in file_ops])
         applied, failed, skipped = [], [], []
         for op in file_ops:
             path = op["path"]
@@ -225,13 +259,10 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
                 existing = read_file(repo_path, path)
                 if existing is None:
                     failed.append((path, "file not found for EDIT")); continue
-                s, r = op["search"], op["replace"]
-                n = existing.count(s)
-                if n == 0:
-                    failed.append((path, "SEARCH text not found")); continue
-                if n > 1:
-                    failed.append((path, f"SEARCH not unique ({n} matches)")); continue
-                write_file(repo_path, path, existing.replace(s, r, 1)); applied.append(path)
+                new_content, reason = _apply_edit(existing, op["search"], op["replace"])
+                if new_content is None:
+                    failed.append((path, reason)); continue
+                write_file(repo_path, path, new_content); applied.append(path)
         changed = sorted(set(applied))
         if failed:
             log.warning("dev: %d edit(s) did not apply: %s", len(failed), failed)
