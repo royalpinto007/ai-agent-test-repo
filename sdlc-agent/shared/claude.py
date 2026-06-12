@@ -89,7 +89,10 @@ def _parse_reset_seconds(stderr: str) -> int | None:
         reset_ts = int(m.group(1))
         return max(0, reset_ts - int(time.time()))
 
-    if re.search(r"(usage limit reached|rate limit|too many requests)", text, re.IGNORECASE):
+    # Match the real Claude CLI limit phrasings, including "You've hit your
+    # session limit · resets 1:50pm (UTC)" which previously slipped through to a
+    # generic error instead of the graceful auto-resume.
+    if re.search(r"(usage limit|session limit|rate limit|too many requests|limit reached)", text, re.IGNORECASE):
         m = re.search(r"reset[s]?\s*(?:at)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?", text, re.IGNORECASE)
         if m:
             hour = int(m.group(1))
@@ -99,10 +102,12 @@ def _parse_reset_seconds(stderr: str) -> int | None:
                 hour += 12
             if ampm == "am" and hour == 12:
                 hour = 0
-            now = datetime.now(timezone.utc).astimezone()
+            # The CLI states the reset in UTC ("(UTC)"); honour that when present
+            # so we don't mis-compute on a non-UTC box.
+            now = datetime.now(timezone.utc) if "utc" in text.lower() else datetime.now(timezone.utc).astimezone()
             reset = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             if reset <= now:
-                reset = reset.replace(day=reset.day + 1)
+                reset += timedelta(days=1)
             return int((reset - now).total_seconds())
         return 3600
 
