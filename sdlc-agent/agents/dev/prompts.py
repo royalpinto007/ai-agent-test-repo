@@ -37,7 +37,7 @@ def implementation_prompt(issue_title, issue_description, file_contents, affecte
     affected_section = "\n".join(f"- {f}" for f in affected_files) if affected_files else "None identified"
     pm_section = f"\nTASK DETAILS FROM PM:\n{pm_tasks}" if pm_tasks else ""
 
-    return f"""CONSTRAINT: You have no tool access — no shell, no network, no file reads. Everything you need (file tree and current file contents) is already in this prompt. This is a SINGLE-SHOT request: you will NOT get another turn, so do not say "let me check" or "reading the files" or emit exploratory shell commands — there is nobody to run them. Do NOT emit `<function_calls>` or any tool-invocation XML. Produce the COMPLETE implementation right now, as actual file contents in the `## Changes` / `FILE:` format specified below. If something is genuinely missing, make a reasonable assumption, note it in ## Summary, and still output the files.
+    return f"""CONSTRAINT: You have no tool access — no shell, no network, no file reads. Everything you need (file tree and current file contents) is already in this prompt. This is a SINGLE-SHOT request: you will NOT get another turn, so do not say "let me check" or "reading the files" or emit exploratory shell commands. Do NOT emit `<function_calls>` or any tool-invocation XML. Produce the implementation now, as precise edits in the `## Changes` format specified below.
 
 Implement the task. Match the existing code style exactly.
 
@@ -57,11 +57,11 @@ CURRENT FILE CONTENTS:
 FILE TREE:
 {file_tree}
 
-Rules:
-- Match the existing code style exactly (naming, spacing, error handling, exports)
-- Don't change anything not required by the task
-- Handle error conditions — don't let things fail silently
-- Output complete file contents, never partial snippets
+CRITICAL — how to edit:
+- To change an EXISTING file, output a SEARCH/REPLACE edit. The SEARCH block must be copied VERBATIM from the CURRENT FILE CONTENTS above (exact characters, indentation, and enough surrounding lines to be UNIQUE in that file). Only the lines you want to change should differ in REPLACE.
+- NEVER reproduce a whole existing file. Edits must be minimal — touch only what the task needs. Do not delete or rewrite code unrelated to the task.
+- Only use NEWFILE for a file that does not exist yet.
+- Match existing style; handle errors; don't break callers (note signature changes in Impact Analysis).
 
 ---
 
@@ -72,20 +72,26 @@ Note any function signature changes (before → after) and who calls them.
 
 ## Changes
 
-FILE: <relative path>
+For each existing file you change, one or more blocks of exactly this form:
+
+EDIT: <relative path>
+<<<<<<< SEARCH
+<exact lines copied verbatim from the current file — unique anchor>
+=======
+<the replacement lines>
+>>>>>>> REPLACE
+
+For a brand-new file only:
+
+NEWFILE: <relative path>
 ```<language>
 <complete file content>
 ```
 
 ## Unit Tests
 
-FILE: <relative test file path>
-```<language>
-<complete test file content>
-```
-
-Cover: happy path, edge cases, boundary values, error conditions, and every acceptance criterion.
-Match the existing test style.
+Add or update tests the same way (EDIT an existing test file, or NEWFILE a new one).
+Cover: happy path, edge cases, boundary values, error conditions, and every acceptance criterion. Match the existing test style. If the change genuinely needs no test (e.g. a comment-only change), say so here and add none.
 
 ## PR Description
 
@@ -123,8 +129,7 @@ Diagnose the failures carefully:
 Return the corrected implementation using the exact same format:
 ## Impact Analysis, ## Changes, ## Unit Tests, ## PR Description, ## Summary
 
-All implementation rules from before still apply.
-Your entire response must be valid code within the headings — no prose outside them.
+Use the same EDIT (SEARCH/REPLACE) blocks for existing files and NEWFILE blocks for new files. SEARCH must match the current file verbatim. Keep edits minimal — don't rewrite whole files. All implementation rules from before still apply.
 """
 
 
@@ -143,6 +148,6 @@ CODEBASE ANALYSIS:
 {codebase_analysis}
 
 Revise the implementation to satisfy the extra instructions while keeping all existing passing tests intact.
-Return the complete updated implementation in the same FILE:/```...``` format.
+Return the updated implementation in the same format: EDIT (SEARCH/REPLACE) blocks for existing files (SEARCH copied verbatim, minimal edits — never whole-file rewrites) and NEWFILE blocks for new files.
 Also update ## PR Description and ## Summary sections to reflect the changes.
 """

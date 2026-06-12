@@ -9,21 +9,25 @@ MAX_RETRIES = 3
 log = logging.getLogger("dev")
 
 
+def _clean_path(path):
+    return path.strip().strip('`*\'" ').strip()
+
+
 def parse_output(output):
-    changes = {}
-    tests = {}
-    for path, content in re.findall(r'FILE:\s*(.+?)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL):
-        # Models often wrap the filename in inline-code backticks, quotes, or
-        # markdown emphasis (e.g. FILE: `local_iomad/version.php`); strip those
-        # so we don't create junk paths like "`local_iomad/...".
-        path = path.strip().strip('`*\'" ').strip()
-        content = content.strip()
-        if not path:
-            continue
-        if "test" in path.lower() or "spec" in path.lower():
-            tests[path] = content
-        else:
-            changes[path] = content
+    """Parse the model's response into a list of file operations:
+    {type:'edit', path, search, replace} for in-place edits of existing files, and
+    {type:'new', path, content} for brand-new files. Edits preserve everything
+    they don't touch, eliminating the whole-file-rewrite content loss."""
+    ops = []
+    for path, search, replace in re.findall(
+            r'EDIT:\s*(.+?)\n<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE', output, re.DOTALL):
+        path = _clean_path(path)
+        if path:
+            ops.append({"type": "edit", "path": path, "search": search, "replace": replace})
+    for path, content in re.findall(r'NEWFILE:\s*(.+?)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL):
+        path = _clean_path(path)
+        if path:
+            ops.append({"type": "new", "path": path, "content": content.strip()})
 
     impact = ""
     m = re.search(r'## Impact Analysis\n(.*?)(?=##|\Z)', output, re.DOTALL)
@@ -40,7 +44,7 @@ def parse_output(output):
     if m:
         summary = m.group(1).strip()
 
-    return changes, tests, impact, pr_description, summary
+    return ops, impact, pr_description, summary
 
 
 def _clean_title(title):
@@ -184,8 +188,9 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         )
 
     attempts = []
+    changed = []
     for attempt in range(1, MAX_RETRIES + 1):
-        changes, tests, impact, pr_description, summary = parse_output(output)
+        file_ops, impact, pr_description, summary = parse_output(output)
 
         try:
             run_git(["checkout", main_branch], cwd=repo_path)
@@ -203,45 +208,61 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         except RuntimeError:
             run_git(["checkout", branch_name], cwd=repo_path)
 
-        # Apply files, but skip the destructive failure modes (prose-as-file,
-        # accidental content loss). Filter changes/tests to what we actually wrote
-        # so staging/commit/PR only reflect real edits.
-        safe_changes, safe_tests, skipped = {}, {}, []
-        for bucket, safe_bucket in ((changes, safe_changes), (tests, safe_tests)):
-            for path, content in bucket.items():
-                ok, reason = _safe_to_write(repo_path, path, content)
-                if ok:
-                    write_file(repo_path, path, content)
-                    safe_bucket[path] = content
-                else:
-                    skipped.append((path, reason))
-                    log.warning("dev: skipped writing %s — %s", path, reason)
-        changes, tests = safe_changes, safe_tests
+        # Apply each op. Edits are surgical (exact SEARCH/REPLACE) so untouched
+        # code is preserved by construction — no whole-file rewrites. New files
+        # still pass the prose/empty guard.
+        applied, failed, skipped = [], [], []
+        for op in file_ops:
+            path = op["path"]
+            if op["type"] == "new":
+                ok, reason = _safe_to_write(repo_path, path, op["content"])
+                if not ok:
+                    skipped.append((path, reason)); log.warning("dev: skipped NEWFILE %s — %s", path, reason); continue
+                write_file(repo_path, path, op["content"]); applied.append(path)
+            else:  # edit
+                existing = read_file(repo_path, path)
+                if existing is None:
+                    failed.append((path, "file not found for EDIT")); continue
+                s, r = op["search"], op["replace"]
+                n = existing.count(s)
+                if n == 0:
+                    failed.append((path, "SEARCH text not found")); continue
+                if n > 1:
+                    failed.append((path, f"SEARCH not unique ({n} matches)")); continue
+                write_file(repo_path, path, existing.replace(s, r, 1)); applied.append(path)
+        changed = sorted(set(applied))
+        if failed:
+            log.warning("dev: %d edit(s) did not apply: %s", len(failed), failed)
 
         test_passed, test_output = run_tests(repo_path, test_command)
         attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output})
 
-        # A "passing" run with zero parsed files is not success — the model
-        # returned prose/exploration instead of FILE: blocks (common on smaller
-        # models). Don't accept it; retry with a pointed nudge.
-        if test_passed and (changes or tests):
+        # Success only when something actually applied, every edit landed, and
+        # tests pass. Otherwise retry with a pointed nudge.
+        if test_passed and changed and not failed:
             break
         if attempt < MAX_RETRIES:
-            if not changes and not tests:
-                nudge = ("Your previous response contained NO `FILE:` blocks — you output no "
-                         "implementation files at all (only prose/exploration). You have no tools "
-                         "and get no further turns. Output the COMPLETE file contents now using the "
-                         "`## Changes` / `FILE:` format.")
+            if failed:
+                nudge = ("These EDITs did not apply: "
+                         + "; ".join(f"{p} ({why})" for p, why in failed)
+                         + ". Re-copy each SEARCH block VERBATIM from the CURRENT FILE CONTENTS "
+                           "(exact characters and indentation), with enough surrounding lines to be "
+                           "unique in that file. Keep edits minimal.")
+                output = ask_claude(retry_prompt(issue_title, output, nudge, attempt, codebase_analysis))
+            elif not changed:
+                nudge = ("Your response produced no applicable changes. Output minimal "
+                         "EDIT (SEARCH/REPLACE) blocks for existing files — SEARCH copied verbatim "
+                         "from the current file contents — and NEWFILE blocks for new files, using "
+                         "the exact format. No whole-file rewrites.")
                 output = ask_claude(retry_prompt(issue_title, output, nudge, attempt, codebase_analysis))
             else:
                 output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
 
     final = attempts[-1]
 
-    # If the model never produced any files, don't push an empty branch (which
-    # yields a 422 "No commits between main and <branch>" on PR creation).
+    # If nothing applied, don't push an empty branch (which 422s on PR creation).
     # Surface it as a dev failure so the pipeline flags it for a redo.
-    if not changes and not tests:
+    if not changed:
         save_session(session_id, {
             "stage": "dev",
             "repo_path": repo_path,
@@ -259,7 +280,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
             "test_passed": False,
             "files_changed": [],
             "attempts": len(attempts),
-            "error": "Dev produced no parseable files after all attempts (model returned prose/exploration instead of `FILE:` blocks). Re-run dev or use `redo-dev: <instructions>`.",
+            "error": "Dev produced no applicable changes after all attempts (no EDIT/NEWFILE blocks applied — likely SEARCH text didn't match). Re-run dev or use `redo-dev: <instructions>`.",
             "next_stage": "dev (no files generated)",
         }
 
@@ -285,7 +306,7 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
             "next_stage": "dev (tests failed)",
         }
 
-    all_files = list({**changes, **tests}.keys())
+    all_files = changed
     for path in all_files:
         run_git(["add", path], cwd=repo_path)
 
@@ -326,8 +347,8 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         "impact_analysis": impact,
         "pr_description": pr_description,
         "summary": summary,
-        "files_changed": list(changes.keys()),
-        "test_files": list(tests.keys()),
+        "files_changed": changed,
+        "test_files": [p for p in changed if "test" in p.lower() or "spec" in p.lower()],
         "affected_files": affected_files,
         "test_passed": final["test_passed"],
         "test_output": final["test_output"],
