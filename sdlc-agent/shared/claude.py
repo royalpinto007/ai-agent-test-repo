@@ -147,4 +147,9 @@ def ask_claude(prompt):
             log.warning("Claude usage limit reached; reset in ~%ds. Not blocking.", wait_seconds)
             raise ClaudeUsageLimitError(wait_seconds, raw_stderr=stderr)
 
-        raise RuntimeError(f"claude exited {result.returncode}: {stderr}")
+        # stderr is often empty on a non-zero exit; the real reason (oversized
+        # input, an API error, a CLI message) usually lands on stdout. Surface
+        # whichever we have so the failure isn't an opaque "claude exited 1:".
+        detail = stderr or (result.stdout or "").strip()[:800] or "(no output on stderr or stdout)"
+        log.error("claude exited %s: %s", result.returncode, detail)
+        raise RuntimeError(f"claude exited {result.returncode}: {detail}")
