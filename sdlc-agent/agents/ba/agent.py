@@ -5,6 +5,8 @@ from shared.session import save_session, load_session
 from shared.config import get_code_repos, is_requirements_repo, all_repos
 from agents.ba.prompts import (
     analysis_and_brd_prompt,
+    minimal_brd_prompt,
+    complexity_classify_prompt,
     followup_prompt,
     revision_prompt,
     bug_analysis_prompt,
@@ -264,9 +266,21 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
             live_config = moodle_live.live_state_for(requirement, ask_claude)
         except Exception:
             live_config = ""
-        combined = ask_claude(analysis_and_brd_prompt(
-            requirement, file_tree_str, file_contents, ui_needed=ui_needed, live_config=live_config))
-        system_analysis, brd = _split_analysis_and_brd(combined)
+        # Triage: a trivial config/workaround gets a terse how-to, not a full
+        # feature spec. UI-mockup requests always take the full path.
+        complexity = ""
+        if not ui_needed:
+            try:
+                complexity = ask_claude(complexity_classify_prompt(requirement)).strip().lower()
+            except Exception:
+                complexity = ""
+        if "simple" in complexity and "normal" not in complexity and "complex" not in complexity:
+            brd = ask_claude(minimal_brd_prompt(requirement, file_contents, live_config=live_config))
+            system_analysis = ""
+        else:
+            combined = ask_claude(analysis_and_brd_prompt(
+                requirement, file_tree_str, file_contents, ui_needed=ui_needed, live_config=live_config))
+            system_analysis, brd = _split_analysis_and_brd(combined)
 
     needs_clarification = _has_open_questions(brd)
     resolution_tier = _parse_resolution_tier(brd)

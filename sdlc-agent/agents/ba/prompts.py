@@ -52,6 +52,64 @@ Recommendation: Option [A/B] — [one line reason]
 """
 
 
+def complexity_classify_prompt(requirement):
+    """One-word triage so trivial requests get a trivial doc.
+
+    Returns guidance for a single-word answer: simple | normal | complex.
+    """
+    return f"""Classify the size of this software request in ONE word.
+
+REQUIREMENT:
+{requirement}
+
+Answer with exactly one of:
+- simple  — satisfied by toggling an existing setting or using existing functionality; no code change (a config/workaround).
+- normal  — a small, well-scoped code change or enhancement.
+- complex — a new feature or multi-part change.
+
+If you are unsure, answer "normal". Output ONLY the one word, nothing else."""
+
+
+def minimal_brd_prompt(requirement, file_contents, live_config=""):
+    """Terse doc for a SIMPLE (config/workaround) request — no feature-spec padding.
+
+    Deliberately omits System Analysis / Why / Who / Out of Scope / Test Cases so
+    the model can't pad a one-setting change into an essay.
+    """
+    files_section = "\n\n".join(
+        f"FILE: {path}\n```\n{content}\n```"
+        for path, content in file_contents.items()
+    )
+    if not files_section.strip():
+        files_section = "(no files loaded)"
+    live_section = ""
+    if live_config and live_config.strip():
+        live_section = f"\n{live_config}\nUse the live config above as ground truth about the current state.\n"
+
+    return f"""You're a Business Analyst answering a SIMPLE configuration/workaround request. Be brief — this should read like a short how-to, not a spec.
+
+REQUIREMENT: {requirement}
+{live_section}
+RELEVANT FILES (excerpts):
+{files_section}
+
+Write ONLY the following, and keep the whole thing under ~12 lines:
+
+## What
+[one sentence — what the user wants.]
+
+## How to do it
+[the exact steps: screen → setting → value. Cite a real path from the files above if relevant. 2-6 short steps.]
+
+[Optional single line starting with "Note:" only if there is a genuine caveat — otherwise omit entirely.]
+
+Then, on the very last line, write exactly one of:
+RESOLUTION_TIER: config
+RESOLUTION_TIER: workaround
+
+Do NOT include: System Analysis, Why, Who, Acceptance Criteria, Out of Scope, Test Cases, Open Questions, or any table. No extra headings beyond the two above."""
+
+
 def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=False, live_config=""):
     """Single-call prompt that produces System Analysis + BRD together.
 
