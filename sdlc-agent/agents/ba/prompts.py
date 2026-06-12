@@ -91,7 +91,12 @@ A UI change was requested for this feature. Produce a single self-contained HTML
 - This is a visual mockup for review, not production markup.
 """
 
-    return f"""You're a Business Analyst writing a requirement document for a development team. Output ONLY the two structured sections below — no prose, no padding.
+    return f"""You're a Business Analyst writing a requirement document for a development team.
+
+MATCH THE LENGTH OF YOUR OUTPUT TO THE SIZE OF THE CHANGE. This is the most important rule:
+- A simple Config or Workaround (e.g. flip one admin setting) needs only a few lines: what it is, the exact steps, and the tier. Then STOP. Do not invent Out of Scope, exhaustive test cases, or multiple open questions for a one-setting change — padding a trivial ask into a feature spec wastes the reader's time.
+- Only a genuine new feature or non-trivial code change earns the full breakdown (detailed acceptance criteria, out-of-scope, positive/negative test cases, open questions).
+When in doubt, err on the side of shorter.
 
 {_STACK_DETECTION_RULES}
 
@@ -106,73 +111,50 @@ RELEVANT FILES (excerpts):
 ---
 
 ## System Analysis
-
-### Detected Stack
-[1-2 lines summarising the stack you inferred from the file tree/contents. Cite specific evidence — e.g. "htdocs/main.inc.php and PHP files → Dolibarr". If unclear, say so.]
-
-### What Exists Today
-- [specific function/file/module and what it does — one bullet per relevant item. Each bullet MUST reference a path from the file tree.]
-
-### What's Missing or Broken
-- [the actual gap between current code and the requirement]
-
-### Type of Change
-Bug fix / Small enhancement / New feature / Large feature — [one line reason]
-
-### Obvious Risks
-- [only things that genuinely matter — skip if none]
+- Simple config/workaround → 1-2 lines: what currently provides this and the gap (cite a path if you have one).
+- Feature/code change → Detected Stack, What Exists Today, What's Missing, Type of Change, Obvious Risks — each bullet citing a path from the tree.
 
 ---
 
 ## Business Requirements Document
 
 ### What
-[1-2 sentences max — what is this and what does success look like]
-
-### Why
-[1 sentence — the business or user reason]
-
-### Who
-[one line — who is affected or benefits]
-
-### Acceptance Criteria
-- [ ] [criterion]
-- [ ] [criterion]
-(max 6 bullets — testable, include error cases)
-
-### Out of Scope
-- [item]
-(max 4 bullets — omit section if none)
+[1-2 sentences — what success looks like.]
 
 ### Resolution Approach
-Pick the cheapest tier that actually solves the requirement.
-
 | Tier | When to choose |
 |------|---------------|
-| **Config** | Existing functionality can be configured to meet the requirement. No code changes, no behavioural changes for other users. |
-| **Workaround** | Existing functionality already supports this — the user just needs to use it differently. No config change, no code change. |
-| **Code change** | Neither config nor workaround can satisfy the requirement. New code is required. |
+| **Config** | Existing functionality can be configured to meet the requirement. No code changes. |
+| **Workaround** | Existing functionality already supports this — use it differently. No config or code change. |
+| **Code change** | Neither config nor workaround can satisfy it. New code required. |
 
-Chosen tier: Config / Workaround / Code change — [one line reason that cites evidence from the file tree where possible]
+Chosen tier: Config / Workaround / Code change — [one line reason, cite a path where possible].
 
-### Workaround (if applicable)
-[omit this section entirely if tier is not "Workaround"]
-[3-5 concrete steps using existing functionality — be specific about screens, fields, settings]
+**If Config or Workaround:** give the exact steps to do it (screens → settings → values, or the precise existing-feature steps). That IS the deliverable. Add at most 2-3 acceptance criteria ONLY if they aren't obvious from the steps. Then go straight to the RESOLUTION_TIER line — no Out of Scope, no Test Cases section.
+
+**If Code change / new feature**, also include the sections below:
+
+### Why
+[1 sentence]
+
+### Who
+[one line]
+
+### Acceptance Criteria
+- [ ] [criterion] (max 6, testable, include error cases)
+
+### Out of Scope
+- [item] (max 4 — omit if none)
 
 ### Test Cases
-Cover both happy path and failure modes — the cases a developer might miss.
-
 **Positive (should work):**
-- [ ] [action → expected result]
-(2-4 cases)
-
+- [ ] [action → expected result] (2-4)
 **Negative (should be rejected / handled gracefully):**
-- [ ] [invalid input or edge case → expected handling — e.g. wrong role, empty field, cross-company access, duplicate]
-(2-4 cases)
+- [ ] [edge case → expected handling] (2-4)
 {ui_section}
 ### Open Questions
-- [question] — Blocking: Yes/No
-(max 3 questions — omit section if none)
+- [only genuinely blocking or decision-changing unknowns] — Blocking: Yes/No
+(max 3 — omit the section entirely if none; a clear config change usually has none)
 
 Finally, on the very last line of your response, write exactly one of:
 RESOLUTION_TIER: config
