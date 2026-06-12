@@ -241,6 +241,10 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
 
     attempts = []
     changed = []
+    # Track the BEST attempt across retries, not the last one. A retry that
+    # regresses (e.g. the model returns fewer/no ops on the second pass) must
+    # not discard a better earlier attempt's applied edits.
+    best = None
     for attempt in range(1, MAX_RETRIES + 1):
         file_ops, impact, pr_description, summary = parse_output(output)
 
@@ -304,6 +308,19 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output,
                          "lint_problems": lint_problems})
 
+        # Snapshot this attempt and keep it if it's the best so far. Ranking:
+        # tests passing first, then most edits applied, then fewest failed, then
+        # fewest new lint problems. This is what we'll ship after the loop, so a
+        # later empty/worse retry can't wipe a good earlier attempt.
+        snapshot = {
+            "changed": changed, "failed": failed, "applied_content": dict(applied_content),
+            "lint_problems": lint_problems, "test_passed": test_passed, "test_output": test_output,
+            "output": output, "impact": impact, "pr_description": pr_description, "summary": summary,
+        }
+        score = (1 if test_passed else 0, len(changed), -len(failed), -len(lint_problems))
+        if changed and (best is None or score > best["score"]):
+            best = {**snapshot, "score": score}
+
         # Success only when something applied, every edit landed, tests pass, and
         # the change introduced no new syntax/standards errors. Else retry.
         if test_passed and changed and not failed and not lint_problems:
@@ -331,7 +348,28 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
             else:
                 output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
 
-    final = attempts[-1]
+    # Prefer the best attempt over whatever the last retry happened to produce.
+    failed_edits = []
+    if best is not None:
+        changed = best["changed"]
+        applied_content = best["applied_content"]
+        failed_edits = best["failed"]
+        output = best["output"]
+        impact, pr_description, summary = best["impact"], best["pr_description"], best["summary"]
+        final = {"attempt": 0, "test_passed": best["test_passed"],
+                 "test_output": best["test_output"], "lint_problems": best["lint_problems"]}
+        # Re-stage the best attempt's content onto the branch — later retries may
+        # have left the working tree in a worse state than `best` reflects.
+        run_git(["checkout", main_branch], cwd=repo_path)
+        try:
+            run_git(["branch", "-D", branch_name], cwd=repo_path)
+        except RuntimeError:
+            pass
+        run_git(["checkout", "-b", branch_name], cwd=repo_path)
+        for _p, _c in applied_content.items():
+            write_file(repo_path, _p, _c)
+    else:
+        final = attempts[-1]
 
     # If nothing applied, don't push an empty branch (which 422s on PR creation).
     # Surface it as a dev failure so the pipeline flags it for a redo.
@@ -418,6 +456,13 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     if commit_result.returncode != 0 and not any(b in _commit_out for b in _benign_commit):
         raise RuntimeError(f"git commit failed: {_commit_out.strip()}")
     run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
+
+    if failed_edits:
+        note = ("\n\n---\n### ⚠️ Edits the agent could not auto-apply\n"
+                "These changes from the plan did not match the current file and were left for a human to complete:\n"
+                + "\n".join(f"- `{p}` — {why}" for p, why in failed_edits))
+        pr_description = (pr_description or "") + note
+        log.warning("dev: shipping best attempt with %d unapplied edit(s): %s", len(failed_edits), failed_edits)
 
     issue_number = session_id.split("-")[-1] if "-" in session_id else None
     pr_url = None
