@@ -1,5 +1,6 @@
 import re
 import logging
+import subprocess
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state
 from shared.session import save_session, load_session
@@ -249,13 +250,14 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         log.warning("dev: parsed %d op(s): %s", len(file_ops),
                     [(o["type"], o["path"]) for o in file_ops])
         applied, failed, skipped = [], [], []
+        applied_content = {}
         for op in file_ops:
             path = op["path"]
             if op["type"] == "new":
                 ok, reason = _safe_to_write(repo_path, path, op["content"])
                 if not ok:
                     skipped.append((path, reason)); log.warning("dev: skipped NEWFILE %s — %s", path, reason); continue
-                write_file(repo_path, path, op["content"]); applied.append(path)
+                write_file(repo_path, path, op["content"]); applied.append(path); applied_content[path] = op["content"]
             else:  # edit
                 existing = read_file(repo_path, path)
                 if existing is None:
@@ -263,17 +265,32 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
                 new_content, reason = _apply_edit(existing, op["search"], op["replace"])
                 if new_content is None:
                     failed.append((path, reason)); continue
-                write_file(repo_path, path, new_content); applied.append(path)
+                write_file(repo_path, path, new_content); applied.append(path); applied_content[path] = new_content
         changed = sorted(set(applied))
         if failed:
             log.warning("dev: %d edit(s) did not apply: %s", len(failed), failed)
 
-        test_passed, test_output = run_tests(repo_path, test_command)
-        attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output})
+        # Lint the files we changed: fail only on NEW problems (syntax errors, or
+        # MORE coding-standard errors than the base had) so we don't choke on a
+        # repo's pre-existing violations. No-op if php/phpcs aren't on the box.
+        lint_problems = []
+        if changed:
+            from shared import lint
+            def _orig(p):
+                r = subprocess.run(["git", "show", f"{main_branch}:{p}"], cwd=repo_path,
+                                   capture_output=True, text=True)
+                return r.stdout if r.returncode == 0 else None
+            lint_problems = lint.lint_changed(_orig, applied_content)
+            if lint_problems:
+                log.warning("dev: lint problems introduced: %s", lint_problems)
 
-        # Success only when something actually applied, every edit landed, and
-        # tests pass. Otherwise retry with a pointed nudge.
-        if test_passed and changed and not failed:
+        test_passed, test_output = run_tests(repo_path, test_command)
+        attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output,
+                         "lint_problems": lint_problems})
+
+        # Success only when something applied, every edit landed, tests pass, and
+        # the change introduced no new syntax/standards errors. Else retry.
+        if test_passed and changed and not failed and not lint_problems:
             break
         if attempt < MAX_RETRIES:
             if failed:
@@ -288,6 +305,12 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
                          "EDIT (SEARCH/REPLACE) blocks for existing files — SEARCH copied verbatim "
                          "from the current file contents — and NEWFILE blocks for new files, using "
                          "the exact format. No whole-file rewrites.")
+                output = ask_claude(retry_prompt(issue_title, output, nudge, attempt, codebase_analysis))
+            elif lint_problems:
+                nudge = ("Your change introduced new problems on the files you edited: "
+                         + "; ".join(f"{p}: {why}" for p, why in lint_problems)
+                         + ". Fix them — match the existing code style (indentation, spacing, "
+                           "braces) exactly and don't add violations. Keep the edit minimal.")
                 output = ask_claude(retry_prompt(issue_title, output, nudge, attempt, codebase_analysis))
             else:
                 output = ask_claude(retry_prompt(issue_title, output, test_output, attempt, codebase_analysis))
@@ -338,6 +361,25 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
             "attempts": len(attempts),
             "error": f"Tests failed after {len(attempts)} attempt(s). Use `redo-dev: <instructions>` to fix, or check the branch manually.",
             "next_stage": "dev (tests failed)",
+        }
+
+    if final.get("lint_problems"):
+        save_session(session_id, {
+            "stage": "dev", "repo_path": repo_path, "branch": branch_name,
+            "issue_title": issue_title, "codebase_analysis": codebase_analysis,
+            "dev_raw_output": output, "test_passed": final["test_passed"],
+            "files_changed": changed, "attempts": len(attempts),
+        })
+        return {
+            "branch": branch_name,
+            "issue_title": issue_title,
+            "test_passed": final["test_passed"],
+            "files_changed": changed,
+            "attempts": len(attempts),
+            "error": ("Change introduces new syntax/coding-standard errors that would fail CI: "
+                      + "; ".join(f"{p}: {why}" for p, why in final["lint_problems"])
+                      + ". Use `redo-dev: <instructions>` to fix."),
+            "next_stage": "dev (lint failed)",
         }
 
     all_files = changed
