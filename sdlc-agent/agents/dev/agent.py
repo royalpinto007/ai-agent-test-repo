@@ -21,12 +21,15 @@ def parse_output(output):
     they don't touch, eliminating the whole-file-rewrite content loss."""
     ops = []
     for path, search, replace in re.findall(
-            r'EDIT:\s*(.+?)\n[<]{3,}\s*SEARCH\s*\n(.*?)\n[=]{3,}\s*\n(.*?)\n[>]{3,}\s*REPLACE',
+            # Path is the FIRST line after EDIT: only — the model sometimes adds
+            # prose between the path line and the SEARCH marker, so skip any
+            # intervening lines (.*?) rather than folding them into the path.
+            r'EDIT:[ \t]*([^\n]+)\n.*?[<]{3,}\s*SEARCH\s*\n(.*?)\n[=]{3,}\s*\n(.*?)\n[>]{3,}\s*REPLACE',
             output, re.DOTALL | re.IGNORECASE):
         path = _clean_path(path)
         if path:
             ops.append({"type": "edit", "path": path, "search": search, "replace": replace})
-    for path, content in re.findall(r'NEWFILE:\s*(.+?)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL):
+    for path, content in re.findall(r'NEWFILE:[ \t]*([^\n]+)\n```(?:\w+)?\n(.*?)```', output, re.DOTALL):
         path = _clean_path(path)
         if path:
             ops.append({"type": "new", "path": path, "content": content.strip()})
