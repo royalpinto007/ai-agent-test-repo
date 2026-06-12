@@ -1,8 +1,8 @@
 import os
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, read_file, grep_repo, run_git
+from shared.utils import get_file_tree, read_file, grep_repo, grep_repo_fast, run_git
 from shared.session import save_session, load_session
-from shared.config import get_code_repos, is_requirements_repo
+from shared.config import get_code_repos, is_requirements_repo, all_repos
 from agents.ba.prompts import (
     analysis_and_brd_prompt,
     followup_prompt,
@@ -11,27 +11,76 @@ from agents.ba.prompts import (
 )
 
 MAX_FILES_TO_READ = 15
+# A code repo with more source files than this is not dumped wholesale into the
+# prompt (Moodle/IOMAD core alone is ~21k files). Instead we surface only the
+# files matching the requirement's keywords, found via a fast system grep.
+_BIG_REPO_FILES = 400
+_BIG_REPO_MATCHES = 40
 
 
-def _build_repo_context(session_id, repo_path):
+def _keywords(requirement):
+    """Distinctive words from the requirement to grep large repos for."""
+    import re
+    stop = {"this", "that", "with", "from", "have", "should", "would", "will",
+            "when", "what", "which", "their", "there", "page", "site", "user",
+            "users", "account", "accounts", "able", "only", "create", "created",
+            "form", "system", "feature", "into", "they", "them", "your"}
+    words, seen = [], set()
+    for w in re.findall(r"[A-Za-z]{4,}", requirement or ""):
+        lw = w.lower()
+        if lw in stop or lw in seen:
+            continue
+        seen.add(lw)
+        words.append(lw)
+    return words[:8]
+
+
+def _build_repo_context(session_id, repo_path, requirement=""):
     """Return (file_tree_str, file_lookup) for either the single repo or all code repos.
 
     file_lookup is {file_path_as_seen_by_model: (real_repo_path, real_relative_path)}
     so when Claude asks for a file by its slug-prefixed path we know where to read it from.
+
+    For requirements repos we span all registered code repos. Repos under
+    _BIG_REPO_FILES are listed in full; larger ones (e.g. core) are represented
+    only by their keyword-matching files so the prompt stays bounded while still
+    grounding the BRD in real code.
     """
-    parts = session_id.rsplit("-", 1)
-    current_owner_repo = parts[0].replace("-", "/", 1) if "-" in session_id else ""
-    current_owner, current_repo_name = (current_owner_repo.split("/", 1) + [""])[:2]
-    on_requirements_repo = is_requirements_repo(current_owner, current_repo_name)
+    # Decide requirements-vs-code by matching the repo_path we were handed against
+    # repos.json. Recovering owner/repo from the session_id by string surgery is
+    # unreliable when the owner itself contains hyphens (e.g.
+    # "Health-and-Safety-Solution"), which would leave grounding silently off.
+    on_requirements_repo = False
+    if repo_path:
+        target = os.path.realpath(repo_path)
+        for _, c in all_repos().items():
+            cp = c.get("repo_path")
+            if cp and os.path.realpath(cp) == target:
+                on_requirements_repo = bool(c.get("requirements_repo"))
+                break
 
     tree_lines = []
     lookup = {}
+    keywords = _keywords(requirement)
 
     if on_requirements_repo:
         for slug, cfg in get_code_repos().items():
             rp = cfg.get("repo_path", "")
-            if rp and os.path.isdir(rp):
-                for f in get_file_tree(rp):
+            if not (rp and os.path.isdir(rp)):
+                continue
+            files = get_file_tree(rp)
+            if len(files) <= _BIG_REPO_FILES:
+                for f in files:
+                    seen = f"{slug}/{f}"
+                    tree_lines.append(seen)
+                    lookup[seen] = (rp, f)
+            else:
+                # Large repo: don't dump its tree — surface only keyword matches.
+                matched = grep_repo_fast(rp, keywords, max_results=_BIG_REPO_MATCHES) if keywords else []
+                tree_lines.append(
+                    f"# {slug}: large repo ({len(files)} files) — showing only files "
+                    f"matching the requirement; grep for more if needed")
+                for f in matched:
                     seen = f"{slug}/{f}"
                     tree_lines.append(seen)
                     lookup[seen] = (rp, f)
@@ -161,7 +210,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     except Exception:
         pass
 
-    file_tree_str, file_lookup = _build_repo_context(session_id, repo_path)
+    file_tree_str, file_lookup = _build_repo_context(session_id, repo_path, requirement)
 
     if issue_type == "Bug":
         file_contents = _load_relevant_files(requirement, file_tree_str, file_lookup)
