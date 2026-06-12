@@ -53,21 +53,26 @@ Recommendation: Option [A/B] — [one line reason]
 
 
 def complexity_classify_prompt(requirement):
-    """One-word triage so trivial requests get a trivial doc.
+    """Triage that separates two axes: config-vs-code, and small-vs-large.
 
-    Returns guidance for a single-word answer: simple | normal | complex.
+    Returns guidance for a single-word answer: config | small | large.
+    - config decides whether the pipeline short-circuits (no build).
+    - small vs large decides how terse the BRD is. BOTH small and large are code
+      changes that go through Dev and produce a PR.
     """
-    return f"""Classify the size of this software request in ONE word.
+    return f"""Classify this software request in ONE word.
 
 REQUIREMENT:
 {requirement}
 
 Answer with exactly one of:
-- simple  — satisfied by toggling an existing setting or using existing functionality; no code change (a config/workaround).
-- normal  — a small, well-scoped code change or enhancement.
-- complex — a new feature or multi-part change.
+- config — can be satisfied WITHOUT editing source code: by changing an admin/site setting, or by using existing functionality differently. No PR will be produced.
+- small  — needs a SMALL source-code edit (a few lines, typically one file): e.g. add a code comment, change a constant/default in code, add a small helper. This IS a code change and must go through development.
+- large  — a new feature or a multi-file code change.
 
-If you are unsure, answer "normal". Output ONLY the one word, nothing else."""
+Key rule: if it requires editing source files AT ALL (even a one-line code comment), it is "small" or "large", NEVER "config". "config" is only for settings/no-code solutions. If unsure between small and large, answer "small"; if unsure whether code is needed at all, answer "small".
+
+Output ONLY the one word, nothing else."""
 
 
 def minimal_brd_prompt(requirement, file_contents, live_config=""):
@@ -108,6 +113,44 @@ RESOLUTION_TIER: config
 RESOLUTION_TIER: workaround
 
 Do NOT include: System Analysis, Why, Who, Acceptance Criteria, Out of Scope, Test Cases, Open Questions, or any table. No extra headings beyond the two above."""
+
+
+def minimal_code_brd_prompt(requirement, file_contents, live_config=""):
+    """Terse BRD for a SMALL code change — brief, but still a code change that
+    goes through development (ends with RESOLUTION_TIER: code_change). Avoids the
+    full feature-spec padding while giving Dev enough to implement."""
+    files_section = "\n\n".join(
+        f"FILE: {path}\n```\n{content}\n```"
+        for path, content in file_contents.items()
+    )
+    if not files_section.strip():
+        files_section = "(no files loaded)"
+    live_section = ""
+    if live_config and live_config.strip():
+        live_section = f"\n{live_config}\n"
+
+    return f"""You're a Business Analyst scoping a SMALL code change for a developer. Be brief — a few lines, not a full spec.
+
+REQUIREMENT: {requirement}
+{live_section}
+RELEVANT FILES (excerpts):
+{files_section}
+
+Write ONLY:
+
+## What
+[one sentence — what the change is.]
+
+## Where
+[the file(s) / area to change, citing a real path from the files above if you can.]
+
+## Acceptance Criteria
+- [ ] [2-3 short, testable criteria — include "no unrelated behaviour changes" when apt]
+
+Then, on the very last line, write exactly:
+RESOLUTION_TIER: code_change
+
+Do NOT include System Analysis, Why/Who, Out of Scope, Test Cases, or Open Questions. This is a code change — it will go through development and produce a PR."""
 
 
 def analysis_and_brd_prompt(requirement, file_tree, file_contents, ui_needed=False, live_config=""):

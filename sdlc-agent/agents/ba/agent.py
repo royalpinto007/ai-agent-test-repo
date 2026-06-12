@@ -6,6 +6,7 @@ from shared.config import get_code_repos, is_requirements_repo, all_repos
 from agents.ba.prompts import (
     analysis_and_brd_prompt,
     minimal_brd_prompt,
+    minimal_code_brd_prompt,
     complexity_classify_prompt,
     followup_prompt,
     revision_prompt,
@@ -291,16 +292,21 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
             live_config = moodle_live.live_state_for(requirement, ask_claude)
         except Exception:
             live_config = ""
-        # Triage: a trivial config/workaround gets a terse how-to, not a full
-        # feature spec. UI-mockup requests always take the full path.
+        # Triage on two axes: config-vs-code and small-vs-large.
+        #  - config  -> terse how-to, pipeline short-circuits (no PR).
+        #  - small   -> terse BRD, but a real code change (full Dev->PR path).
+        #  - large   -> full BRD. UI-mockup requests always take the full path.
         complexity = ""
         if not ui_needed:
             try:
                 complexity = ask_claude(complexity_classify_prompt(requirement)).strip().lower()
             except Exception:
                 complexity = ""
-        if "simple" in complexity and "normal" not in complexity and "complex" not in complexity:
+        if "config" in complexity:
             brd = ask_claude(minimal_brd_prompt(requirement, file_contents, live_config=live_config))
+            system_analysis = ""
+        elif "small" in complexity:
+            brd = ask_claude(minimal_code_brd_prompt(requirement, file_contents, live_config=live_config))
             system_analysis = ""
         else:
             combined = ask_claude(analysis_and_brd_prompt(
