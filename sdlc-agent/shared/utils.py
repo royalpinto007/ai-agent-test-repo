@@ -62,7 +62,10 @@ def read_file(repo_path, file_path):
     abs_path = os.path.join(repo_path, file_path)
     if not os.path.exists(abs_path):
         return None
-    with open(abs_path, "r") as f:
+    # Real-world repos (e.g. Moodle/IOMAD core) contain files with legacy
+    # encodings (CP1252 smart quotes/en-dashes, byte 0x96, etc.). Decode
+    # leniently so one stray byte can't crash an entire agent run.
+    with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
         return f.read()
 
 
@@ -460,11 +463,14 @@ def grep_repo_fast(repo_path, keywords, includes=None, max_results=40):
     cmd += ["--include=" + inc for inc in includes]
     cmd += ["-e", "|".join(kws), repo_path]
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        # Capture bytes and decode leniently — repo paths/content can contain
+        # non-UTF-8 bytes that would otherwise raise during decoding.
+        out = subprocess.run(cmd, capture_output=True, timeout=30)
+        stdout = out.stdout.decode("utf-8", errors="replace")
     except Exception:
         return []
     files = []
-    for line in out.stdout.splitlines():
+    for line in stdout.splitlines():
         line = line.strip()
         if line:
             files.append(os.path.relpath(line, repo_path))
