@@ -1,10 +1,12 @@
 import re
+import logging
 from shared.claude import ask_claude
 from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state
 from shared.session import save_session, load_session
 from agents.dev.prompts import codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt
 
 MAX_RETRIES = 3
+log = logging.getLogger("dev")
 
 
 def parse_output(output):
@@ -41,8 +43,41 @@ def parse_output(output):
     return changes, tests, impact, pr_description, summary
 
 
+def _clean_title(title):
+    """Trim a title that swallowed the body's first markdown heading
+    (e.g. 'Show order reference ... ## What are we building?') to just the title."""
+    t = (title or "").split("\n")[0]
+    t = re.split(r'\s+#{1,6}\s', t)[0]
+    return t.strip()
+
+
+# Phrases that signal the model returned an explanation instead of file content.
+_PROSE_MARKERS = (
+    "no changes required", "no change required", "no changes needed",
+    "no modifications needed", "the implementation is already",
+    "already correct and complete", "here is the confirmed file",
+    "here is the unchanged file",
+)
+
+
+def _safe_to_write(repo_path, path, new_content):
+    """Guard against the two destructive failure modes seen in practice:
+    (1) the model writes prose ('No changes required...') as if it were the file;
+    (2) it regenerates an existing file but drops most of its content (e.g. a
+    lang file losing strings). Returns (ok, reason)."""
+    head = new_content.strip()[:300].lower()
+    if any(m in head for m in _PROSE_MARKERS):
+        return False, "content reads as an explanation, not file contents"
+    existing = read_file(repo_path, path)
+    if existing is not None and len(existing) > 500 and len(new_content) < 0.7 * len(existing):
+        return False, (f"rewrite is {len(new_content)}B vs existing {len(existing)}B "
+                       f"(<70%) — likely accidental content loss")
+    return True, ""
+
+
 def run(session_id, issue_title, issue_description, repo_path, branch_name=None, redo_instructions=None, test_command=None, main_branch="main"):
     session = load_session(session_id) or {}
+    issue_title = _clean_title(issue_title)
 
     # If PM identified a specific code repo to work on (requirements-repo flow),
     # override repo_path, test_command, and main_branch from it.
@@ -156,14 +191,32 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
             run_git(["checkout", main_branch], cwd=repo_path)
             run_git(["pull"], cwd=repo_path)
             if attempt == 1:
+                # Start clean: drop any stale local branch from a previous failed
+                # run so retries don't stack a second commit on the same branch.
+                try:
+                    run_git(["branch", "-D", branch_name], cwd=repo_path)
+                except RuntimeError:
+                    pass
                 run_git(["checkout", "-b", branch_name], cwd=repo_path)
             else:
                 run_git(["checkout", branch_name], cwd=repo_path)
         except RuntimeError:
             run_git(["checkout", branch_name], cwd=repo_path)
 
-        for path, content in {**changes, **tests}.items():
-            write_file(repo_path, path, content)
+        # Apply files, but skip the destructive failure modes (prose-as-file,
+        # accidental content loss). Filter changes/tests to what we actually wrote
+        # so staging/commit/PR only reflect real edits.
+        safe_changes, safe_tests, skipped = {}, {}, []
+        for bucket, safe_bucket in ((changes, safe_changes), (tests, safe_tests)):
+            for path, content in bucket.items():
+                ok, reason = _safe_to_write(repo_path, path, content)
+                if ok:
+                    write_file(repo_path, path, content)
+                    safe_bucket[path] = content
+                else:
+                    skipped.append((path, reason))
+                    log.warning("dev: skipped writing %s — %s", path, reason)
+        changes, tests = safe_changes, safe_tests
 
         test_passed, test_output = run_tests(repo_path, test_command)
         attempts.append({"attempt": attempt, "test_passed": test_passed, "test_output": test_output})
