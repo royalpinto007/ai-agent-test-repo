@@ -3,7 +3,7 @@ import os
 import json
 import subprocess
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, create_github_issue
+from shared.utils import get_file_tree, narrow_file_tree, create_github_issue
 from shared.session import save_session, load_session
 from shared.config import all_repos, get_code_repos, is_requirements_repo
 from agents.pm.prompts import brd_review_prompt, questions_followup_prompt, revision_prompt as pm_revision_prompt
@@ -177,12 +177,12 @@ def run(session_id, repo_path=None, brd=None, ba_answers=None, human_feedback=No
         for slug, cfg in code_repos.items():
             rp = cfg.get("repo_path", "")
             if rp and os.path.isdir(rp):
-                for f in get_file_tree(rp):
+                for f in narrow_file_tree(rp, brd + "\n" + sdd + "\n" + system_analysis):
                     combined_tree_lines.append(f"{slug}/{f}")
         file_tree_str = "\n".join(combined_tree_lines) if combined_tree_lines else "(no code repos cloned yet)"
         other_repos = list(code_repos.keys())
     else:
-        file_tree_str = "\n".join(get_file_tree(repo_path))
+        file_tree_str = "\n".join(narrow_file_tree(repo_path, brd + "\n" + sdd + "\n" + system_analysis))
         try:
             registered = all_repos()
             other_repos = [slug for slug in registered if slug != current_owner_repo]

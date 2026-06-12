@@ -447,6 +447,30 @@ def grep_repo(repo_path, pattern, file_tree):
     return matches
 
 
+def narrow_file_tree(repo_path, hint_text="", threshold=800, cap=150):
+    """File list for prompting that won't overflow on huge repos.
+
+    Small repos: the full tree. Large repos (e.g. Moodle/IOMAD core, ~21k files):
+    only the files named in hint_text (BRD/SDD, matched by basename) plus
+    keyword-grep matches — so SA/PM/Dev prompts stay bounded but still include the
+    files the work actually touches.
+    """
+    tree = get_file_tree(repo_path)
+    if len(tree) <= threshold:
+        return tree
+    basenames = {p.rsplit("/", 1)[-1] for p in re.findall(r'[\w./-]+\.php', hint_text or "")}
+    cand = [f for f in tree if f.rsplit("/", 1)[-1] in basenames]
+    seen, kws = set(), []
+    for w in re.findall(r'[A-Za-z]{6,}', hint_text or ""):
+        lw = w.lower()
+        if lw not in seen:
+            seen.add(lw); kws.append(lw)
+    for f in grep_repo_fast(repo_path, kws[:6], max_results=60):
+        if f not in cand:
+            cand.append(f)
+    return sorted(set(cand))[:cap] if cand else tree[:cap]
+
+
 def grep_repo_fast(repo_path, keywords, includes=None, max_results=40):
     """Find files whose contents match ANY of `keywords`, using system grep.
 

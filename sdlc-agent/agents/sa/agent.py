@@ -1,6 +1,6 @@
 import re
 from shared.claude import ask_claude
-from shared.utils import get_file_tree
+from shared.utils import get_file_tree, narrow_file_tree
 from shared.session import save_session, load_session
 from agents.sa.prompts import solution_design_prompt, revision_prompt
 
@@ -25,7 +25,7 @@ def run(session_id, repo_path=None, human_feedback=None):
     if not brd:
         raise ValueError("brd is required — run BA agent first (session must have brd_draft)")
 
-    file_tree_str = "\n".join(get_file_tree(repo_path))
+    file_tree_str = "\n".join(narrow_file_tree(repo_path, brd + "\n" + system_analysis))
 
     previous_sdd = session.get("sdd", "")
     if human_feedback and previous_sdd:
