@@ -152,8 +152,10 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     # truncate large files, and cap the total payload with headroom for the
     # prompt scaffolding, file tree, and the model's output.
     MAX_DEV_FILES = 25
-    PER_FILE_CHARS = 20000
-    TOTAL_CHARS = 300000  # ~75k tokens
+    # Files the model edits must be shown in full (truncation below an anchor
+    # would break exact SEARCH matching), so allow a larger per-file slice.
+    PER_FILE_CHARS = 45000
+    TOTAL_CHARS = 340000  # ~85k tokens, leaving headroom under the 200k limit
     ordered = seed_files + [f for f in affected_files if f not in seed_files]
     file_contents = {}
     total = 0
