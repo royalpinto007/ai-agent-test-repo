@@ -207,7 +207,16 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     else:
         # First pass: load files, then one combined call.
         file_contents = _load_relevant_files(requirement, file_tree_str, file_lookup)
-        combined = ask_claude(analysis_and_brd_prompt(requirement, file_tree_str, file_contents, ui_needed=ui_needed))
+        # Ground the BRD in the live instance's actual config when available
+        # (empty string if MOODLE_LIVE_SSH isn't configured or the box is unreachable).
+        live_config = ""
+        try:
+            from shared import moodle_live
+            live_config = moodle_live.live_state_for(requirement, ask_claude)
+        except Exception:
+            live_config = ""
+        combined = ask_claude(analysis_and_brd_prompt(
+            requirement, file_tree_str, file_contents, ui_needed=ui_needed, live_config=live_config))
         system_analysis, brd = _split_analysis_and_brd(combined)
 
     needs_clarification = _has_open_questions(brd)
