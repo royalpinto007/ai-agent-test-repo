@@ -196,6 +196,31 @@ def _detect_ui_needed(requirement):
     return bool(m and m.group(1).lower() == "yes")
 
 
+def _detect_component(requirement):
+    """Map the issue form's 'Affected component' choice to a registered code repo.
+
+    Returns a target_repo dict ({slug, repo_path, test_command, main_branch}) so
+    Dev/Review run against — and open the PR in — that repo, or None when the
+    requester left it unset / 'not sure' (then PM decides as before).
+    """
+    import re
+    m = re.search(r'affected component[^\n]*\n+\s*([^\n]+)', requirement or "", re.IGNORECASE)
+    if not m:
+        return None
+    val = m.group(1).strip().strip("`").lower()
+    if not val or val.startswith(("not sure", "none", "n/a", "_no response_", "unsure")):
+        return None
+    for slug, cfg in get_code_repos().items():
+        if slug.split("/")[-1].lower() == val:
+            return {
+                "slug": slug,
+                "repo_path": cfg.get("repo_path", ""),
+                "test_command": cfg.get("test_command"),
+                "main_branch": cfg.get("main_branch", "main"),
+            }
+    return None
+
+
 def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None, issue_type=None):
     session = load_session(session_id) or {}
     requirement = requirement or session.get("requirement", "")
@@ -286,7 +311,11 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     resolution_tier = _parse_resolution_tier(brd)
     config_only = resolution_tier in ("config", "workaround")
 
-    save_session(session_id, {
+    # If the requester named a target component on the issue form, route the
+    # downstream code stages (and the PR) to that repo. None => PM decides.
+    target_repo = _detect_component(requirement)
+
+    session_update = {
         "requirement": requirement,
         "issue_title": requirement.split("\n")[0].strip(),
         "repo_path": repo_path,
@@ -298,7 +327,10 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         "config_only": config_only,
         "ui_needed": ui_needed,
         "stage": "ba",
-    })
+    }
+    if target_repo:
+        session_update["target_repo"] = target_repo
+    save_session(session_id, session_update)
 
     return {
         "system_analysis": system_analysis,
