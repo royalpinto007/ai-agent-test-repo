@@ -107,11 +107,29 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
 
     seed_files, affected_files = identify_relevant_files(issue_title, issue_description, repo_path, file_tree)
 
+    # Bound the context we feed the model: real repos (e.g. IOMAD plugins) can
+    # blow past the 200k-token limit if we paste every matched file in full.
+    # Prioritise seed files (the model's own picks) over grep-matched ones,
+    # truncate large files, and cap the total payload with headroom for the
+    # prompt scaffolding, file tree, and the model's output.
+    MAX_DEV_FILES = 25
+    PER_FILE_CHARS = 20000
+    TOTAL_CHARS = 300000  # ~75k tokens
+    ordered = seed_files + [f for f in affected_files if f not in seed_files]
     file_contents = {}
-    for f in set(seed_files + affected_files):
+    total = 0
+    for f in ordered:
+        if len(file_contents) >= MAX_DEV_FILES or total >= TOTAL_CHARS:
+            break
         content = read_file(repo_path, f)
-        if content:
-            file_contents[f] = content
+        if not content:
+            continue
+        if len(content) > PER_FILE_CHARS:
+            content = content[:PER_FILE_CHARS] + "\n\n... [truncated for length]"
+        if total + len(content) > TOTAL_CHARS:
+            continue  # skip this one, try smaller later files
+        file_contents[f] = content
+        total += len(content)
 
     # Phase 1: understand the codebase before writing any code
     codebase_analysis = session.get("codebase_analysis") or ask_claude(
