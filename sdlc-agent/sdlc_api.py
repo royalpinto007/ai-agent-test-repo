@@ -19,6 +19,43 @@ import agents.deploy.agent as deploy
 
 app = Flask(__name__)
 
+
+@app.before_request
+def _simulate_usage_limit():
+    """Test hook for the auto-resume loop — OFF unless explicitly enabled.
+
+    Set SDLC_SIMULATE_LIMIT_STAGE to a stage name (e.g. "dev", "review", or
+    "any") and the matching agent endpoint raises a usage-limit error *once per
+    session+stage*, exactly as a real exhausted limit would: the endpoint returns
+    200 rate_limited, the issue gets the "will resume automatically" comment, and
+    n8n Waits then re-calls the step. The second call (after the Wait) sails
+    through, so the pipeline continues — letting you watch the whole loop without
+    burning a real Claude limit. SDLC_SIMULATE_LIMIT_SECONDS controls the wait
+    (default 120s so the test resumes in ~2 min instead of hours).
+    """
+    want = os.environ.get("SDLC_SIMULATE_LIMIT_STAGE", "").strip().lower()
+    if not want:
+        return
+    path = (request.path or "").lstrip("/")
+    if not path.endswith("-agent"):
+        return
+    stage = path.replace("-agent", "")
+    if want not in ("any", "all", stage):
+        return
+    data = request.get_json(silent=True) or {}
+    marker = os.path.join(
+        "/tmp", "sdlc-sim-limit-" + (str(_sid(data)) or "nosid").replace("/", "_") + "-" + stage
+    )
+    if os.path.exists(marker):
+        return  # already fired once for this session+stage — let it through now
+    try:
+        open(marker, "w").close()
+    except OSError:
+        pass
+    secs = int(os.environ.get("SDLC_SIMULATE_LIMIT_SECONDS", "120") or "120")
+    raise ClaudeUsageLimitError(secs, raw_stderr="[simulated usage limit]")
+
+
 # Fallback repo path if no repos.json entry found
 DEFAULT_REPO_PATH = os.environ.get(
     "REPO_PATH", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -67,8 +104,8 @@ def _agent_failure(e):
     """Standard error response for an agent endpoint.
 
     Claude usage-limit errors are re-raised so the app-level errorhandler can post
-    a clear "try again after the reset" comment and return 503; everything else
-    becomes a generic 500.
+    a clear "resuming after the reset" comment and return a 200 rate_limited body
+    (which n8n's Wait/retry path keys off of); everything else becomes a generic 500.
     """
     if isinstance(e, ClaudeUsageLimitError):
         raise e
@@ -92,13 +129,16 @@ def _handle_usage_limit(e):
             post_github_comment(owner, repo, issue_number, e.comment_body(stage), token)
         except Exception:
             pass
+    # Return 200 (not 503) so n8n treats it as a normal response: the orchestrator
+    # gates on status == "rate_limited", Waits retry_after_seconds, then re-calls
+    # this same step. A 503 would error the HTTP node and stop the whole chain.
     return jsonify({
         "status": "rate_limited",
         "stage": stage,
         "message": e.user_message,
         "retry_after_seconds": e.wait_seconds,
         "reset_at": e.reset_at_str,
-    }), 503
+    }), 200
 
 
 @app.route("/repos", methods=["GET"])

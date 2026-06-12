@@ -44,7 +44,7 @@ class ClaudeUsageLimitError(RuntimeError):
         else:
             window = f"about {max(1, round(self.wait_seconds / 60))} min"
         return (f"Limits reset in {window} (around {self.reset_at_str}). "
-                f"Please re-trigger this step after the reset.")
+                f"This step will resume automatically after the reset — no action needed.")
 
     @property
     def user_message(self):
@@ -55,7 +55,7 @@ class ClaudeUsageLimitError(RuntimeError):
         return (f"⏳ **Claude usage limit reached.**\n\n"
                 f"The pipeline paused{where} because the account's Claude usage limit is "
                 f"currently exhausted. {self.reset_clause}\n\n"
-                f"_No work was lost — re-run this step once the limit resets._")
+                f"_No work was lost — the pipeline will pick this step back up on its own._")
 
 # Optional model override. Set CLAUDE_MODEL in the environment (e.g. in
 # /etc/sdlc-agent/env) to pin a specific model — e.g. "haiku" for a lighter,

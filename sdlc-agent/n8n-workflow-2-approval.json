@@ -610,7 +610,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🏗️ Solution Architect — Solution Design Document (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '⚠️ Yes — see Section 11' : '✅ None' }}\n**Next step:** Review the SDD. Comment `approve` to proceed to PM, or `revise: <feedback>` to request changes.\n\n---\n\n{{ $json.sdd }}"
+        "body": "=## \ud83c\udfd7\ufe0f Solution Architect \u2014 Solution Design Document (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '\u26a0\ufe0f Yes \u2014 see Section 11' : '\u2705 None' }}\n**Next step:** Review the SDD. Comment `approve` to proceed to PM, or `revise: <feedback>` to request changes.\n\n---\n\n{{ $json.sdd }}"
       },
       "id": "comment-sa",
       "name": "Comment SA Result",
@@ -735,7 +735,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 PM Agent — Project Plan\n\n**Dev ready:** {{ $json.dev_ready ? '✅ Yes' : '⏳ Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n{{ $json.created_issues && $json.created_issues.length > 0 ? '\\n### GitHub Issues Created\\n' + $json.created_issues.map(i => `- [#${i.issue_number} ${i.title}](${i.issue_url})`).join('\\n') : '' }}\n{{ $json.cross_repo_issues && $json.cross_repo_issues.length > 0 ? '\\n### Cross-repo Issues Created\\n' + $json.cross_repo_issues.map(i => `- [${i.repo}#${i.issue_number || 'err'} ${i.issue_title}](${i.issue_url || '#'})`).join('\\n') : '' }}\n\n**Next step:** Review the plan, then comment `approve` to start development. You can also `revise: <feedback>` to change the task breakdown, or `assign: @username` to assign tasks.\n\n---\n\n{{ $json.pm_output }}"
+        "body": "=## \ud83e\udd16 PM Agent \u2014 Project Plan\n\n**Dev ready:** {{ $json.dev_ready ? '\u2705 Yes' : '\u23f3 Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n{{ $json.created_issues && $json.created_issues.length > 0 ? '\\n### GitHub Issues Created\\n' + $json.created_issues.map(i => `- [#${i.issue_number} ${i.title}](${i.issue_url})`).join('\\n') : '' }}\n{{ $json.cross_repo_issues && $json.cross_repo_issues.length > 0 ? '\\n### Cross-repo Issues Created\\n' + $json.cross_repo_issues.map(i => `- [${i.repo}#${i.issue_number || 'err'} ${i.issue_title}](${i.issue_url || '#'})`).join('\\n') : '' }}\n\n**Next step:** Review the plan, then comment `approve` to start development. You can also `revise: <feedback>` to change the task breakdown, or `assign: @username` to assign tasks.\n\n---\n\n{{ $json.pm_output }}"
       },
       "id": "comment-pm",
       "name": "Comment PM Result",
@@ -860,7 +860,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 💻 Dev Agent — Implementation {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.test_passed ? '' : '\\n> ⚠️ Tests failed after all retries. Use `redo-dev: <instructions>` to fix, or push a manual fix to the branch.\\n' }}{{ $json.pr_url ? '**PR:** ' + $json.pr_url : ($json.pr_error ? '**PR:** ❌ ' + $json.pr_error + '\\n\\nTo create the PR manually:\\n```\\ncurl -X POST http://10.68.103.135:5001/create-pr -H \"Content-Type: application/json\" -d \\'{\"session_id\": \"{{ $json.session_id || $(\\'GitHub Comment Webhook\\').item.json.body.repository.owner.login + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.repository.name + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.issue.number }}\"}\\'\\n```' : '') }}\n\n{{ $json.conflicting_prs && $json.conflicting_prs.length > 0 ? '\\n---\\n⚠️ **Potential merge conflicts detected**\\nThe following open PRs touch the same files:\\n' + $json.conflicting_prs.map(p => `- [#${p.number} ${p.title}](${p.url}) — overlapping files: ${p.overlap.join(', ')}`).join('\\n') + '\\n\\nReview the order you merge these. The second merge will likely need a rebase.' : '' }}\n\n{{ $json.test_passed ? '**Next step:** Comment `approve` to deploy to stage.' : '**Next step:** Fix the test failures, then comment `redo-dev: <what you fixed>` to re-run.' }}"
+        "body": "=## \ud83d\udcbb Dev Agent \u2014 Implementation {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.test_passed ? '' : '\\n> \u26a0\ufe0f Tests failed after all retries. Use `redo-dev: <instructions>` to fix, or push a manual fix to the branch.\\n' }}{{ $json.pr_url ? '**PR:** ' + $json.pr_url : ($json.pr_error ? '**PR:** \u274c ' + $json.pr_error + '\\n\\nTo create the PR manually:\\n```\\ncurl -X POST http://10.68.103.135:5001/create-pr -H \"Content-Type: application/json\" -d \\'{\"session_id\": \"{{ $json.session_id || $(\\'GitHub Comment Webhook\\').item.json.body.repository.owner.login + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.repository.name + \\'-\\' + $(\\'GitHub Comment Webhook\\').item.json.body.issue.number }}\"}\\'\\n```' : '') }}\n\n{{ $json.conflicting_prs && $json.conflicting_prs.length > 0 ? '\\n---\\n\u26a0\ufe0f **Potential merge conflicts detected**\\nThe following open PRs touch the same files:\\n' + $json.conflicting_prs.map(p => `- [#${p.number} ${p.title}](${p.url}) \u2014 overlapping files: ${p.overlap.join(', ')}`).join('\\n') + '\\n\\nReview the order you merge these. The second merge will likely need a rebase.' : '' }}\n\n{{ $json.test_passed ? '**Next step:** Comment `approve` to deploy to stage.' : '**Next step:** Fix the test failures, then comment `redo-dev: <what you fixed>` to re-run.' }}"
       },
       "id": "comment-dev",
       "name": "Comment Dev Result",
@@ -1120,7 +1120,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 📋 BA Agent — Revised BRD\n\n**Needs clarification:** {{ $json.needs_clarification ? '⚠️ Yes — see Section 14' : '✅ No' }}\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.brd }}"
+        "body": "=## \ud83d\udccb BA Agent \u2014 Revised BRD\n\n**Needs clarification:** {{ $json.needs_clarification ? '\u26a0\ufe0f Yes \u2014 see Section 14' : '\u2705 No' }}\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.brd }}"
       },
       "id": "comment-ba-revise",
       "name": "Comment BA Revision",
@@ -1138,7 +1138,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🏗️ Solution Architect — Revised SDD (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '⚠️ Yes — see Section 11' : '✅ None' }}\n**Next step:** Comment `approve` to proceed, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.sdd }}"
+        "body": "=## \ud83c\udfd7\ufe0f Solution Architect \u2014 Revised SDD (v{{ $json.revision_count + 1 }})\n\n**Open questions:** {{ $json.has_open_questions ? '\u26a0\ufe0f Yes \u2014 see Section 11' : '\u2705 None' }}\n**Next step:** Comment `approve` to proceed, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.sdd }}"
       },
       "id": "comment-sa-revise",
       "name": "Comment SA Revision",
@@ -1156,7 +1156,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🤖 PM Agent — Revised Plan\n\n**Dev ready:** {{ $json.dev_ready ? '✅ Yes' : '⏳ Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n\n{{ $json.cross_repo_issues && $json.cross_repo_issues.length > 0 ? \"### Cross-repo Issues Created\\n\" + $json.cross_repo_issues.map(i => `- [${i.repo}#${i.issue_number || \"err\"} ${i.issue_title}](${i.issue_url || \"#\"})`).join(\"\\n\") + \"\\n\\n\" : \"\" }}**Next step:** Comment `approve` to start development, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.pm_output }}"
+        "body": "=## \ud83e\udd16 PM Agent \u2014 Revised Plan\n\n**Dev ready:** {{ $json.dev_ready ? '\u2705 Yes' : '\u23f3 Needs answers' }}\n**Issues created:** {{ $json.created_issues ? $json.created_issues.length : 0 }}\n\n{{ $json.cross_repo_issues && $json.cross_repo_issues.length > 0 ? \"### Cross-repo Issues Created\\n\" + $json.cross_repo_issues.map(i => `- [${i.repo}#${i.issue_number || \"err\"} ${i.issue_title}](${i.issue_url || \"#\"})`).join(\"\\n\") + \"\\n\\n\" : \"\" }}**Next step:** Comment `approve` to start development, or `revise: <feedback>` for further changes.\n\n---\n\n{{ $json.pm_output }}"
       },
       "id": "comment-pm-revise",
       "name": "Comment PM Revision",
@@ -1174,7 +1174,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🔄 Dev Agent — Re-implementation\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url }}\n\n### Summary\n{{ $json.summary }}\n\n**Next step:** Comment `approve` for stage deployment, or `redo-dev: <more instructions>` for another pass."
+        "body": "=## \ud83d\udd04 Dev Agent \u2014 Re-implementation\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failing' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n**PR:** {{ $json.pr_url }}\n\n### Summary\n{{ $json.summary }}\n\n**Next step:** Comment `approve` for stage deployment, or `redo-dev: <more instructions>` for another pass."
       },
       "id": "comment-dev-redo",
       "name": "Comment Dev Redo",
@@ -1192,7 +1192,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🔁 Pipeline Reopened — Back to BA\n\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA.\n\n---\n\n{{ $json.brd }}"
+        "body": "=## \ud83d\udd01 Pipeline Reopened \u2014 Back to BA\n\n**Next step:** Review the updated BRD. Comment `approve` to proceed to SA.\n\n---\n\n{{ $json.brd }}"
       },
       "id": "comment-reopen",
       "name": "Comment Reopen",
@@ -1210,7 +1210,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## ✅ QA Skipped — Manually Approved\n\n**STAGE gate:** OPEN\n**PROD gate:** BLOCKED (verify on STAGE first)\n**Pipeline:** Ready for STAGE deployment.\n\n{{ $json.qa_output }}"
+        "body": "=## \u2705 QA Skipped \u2014 Manually Approved\n\n**STAGE gate:** OPEN\n**PROD gate:** BLOCKED (verify on STAGE first)\n**Pipeline:** Ready for STAGE deployment.\n\n{{ $json.qa_output }}"
       },
       "id": "comment-skip-qa",
       "name": "Comment Skip QA",
@@ -1228,7 +1228,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 👤 Issues Assigned\n\n**Assignee:** @{{ $json.assignee }}\n**Issues assigned:** {{ $json.results.filter(r => r.assigned).length }} / {{ $json.results.length }}\n\n{{ $json.results.map(r => r.assigned ? `- ✅ #${r.issue} assigned` : `- ❌ #${r.issue} failed: ${r.error}`).join('\\n') }}"
+        "body": "=## \ud83d\udc64 Issues Assigned\n\n**Assignee:** @{{ $json.assignee }}\n**Issues assigned:** {{ $json.results.filter(r => r.assigned).length }} / {{ $json.results.length }}\n\n{{ $json.results.map(r => r.assigned ? `- \u2705 #${r.issue} assigned` : `- \u274c #${r.issue} failed: ${r.error}`).join('\\n') }}"
       },
       "id": "comment-assign",
       "name": "Comment Assign",
@@ -1246,7 +1246,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## ⚠️ SDLC Pipeline — Session not found\n\nCould not find session `{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}`. Make sure the pipeline was started by opening the issue first."
+        "body": "=## \u26a0\ufe0f SDLC Pipeline \u2014 Session not found\n\nCould not find session `{{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Comment Webhook').item.json.body.repository.name }}-{{ $('GitHub Comment Webhook').item.json.body.issue.number }}`. Make sure the pipeline was started by opening the issue first."
       },
       "id": "comment-no-session",
       "name": "Comment No Session",
@@ -1305,7 +1305,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "={{ $json.status === 'success' ? $json.summary : '❌ Could not retrieve status: ' + $json.message }}"
+        "body": "={{ $json.status === 'success' ? $json.summary : '\u274c Could not retrieve status: ' + $json.message }}"
       },
       "credentials": {}
     },
@@ -1319,7 +1319,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst secret = $env.WEBHOOK_SECRET || '';\nif (!secret) return [{json: $input.item.json}]; // skip if no secret configured\n\nconst sig = $input.item.json.headers?.['x-hub-signature-256'] || '';\nconst body = JSON.stringify($input.item.json.body);\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nif (sig !== expected) {\n  throw new Error('Invalid webhook signature — request rejected');\n}\nreturn [{json: $input.item.json}];"
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.WEBHOOK_SECRET || '';\nif (!secret) return [{json: $input.item.json}]; // skip if no secret configured\n\nconst sig = $input.item.json.headers?.['x-hub-signature-256'] || '';\nconst body = JSON.stringify($input.item.json.body);\nconst expected = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nif (sig !== expected) {\n  throw new Error('Invalid webhook signature \u2014 request rejected');\n}\nreturn [{json: $input.item.json}];"
       }
     },
     {
@@ -1415,7 +1415,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🚀 Stage Deployment — {{ $json.overall_ok ? '✅ Success' : '❌ Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '✅' : '❌' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '✅ Passed' : '❌ Failed' }} {{ $json.smoke_output }}\n{{ $json.merge_result && $json.merge_result.merged ? '**PR:** Merged ✅' : '' }}\n\n**Next step:** {{ $json.overall_ok ? 'Comment `approve` to deploy to production.' : 'Fix deploy issues and comment `approve` to retry.' }}"
+        "body": "=## \ud83d\ude80 Stage Deployment \u2014 {{ $json.overall_ok ? '\u2705 Success' : '\u274c Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '\u2705' : '\u274c' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '\u2705 Passed' : '\u274c Failed' }} {{ $json.smoke_output }}\n{{ $json.merge_result && $json.merge_result.merged ? '**PR:** Merged \u2705' : '' }}\n\n**Next step:** {{ $json.overall_ok ? 'Comment `approve` to deploy to production.' : 'Fix deploy issues and comment `approve` to retry.' }}"
       }
     },
     {
@@ -1472,7 +1472,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🎉 Production Deployment — {{ $json.overall_ok ? '✅ Complete' : '❌ Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '✅' : '❌' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '✅ Passed' : '❌ Failed' }}\n{{ $json.release_url ? '**Release:** ' + $json.release_url : '' }}\n{{ $json.branch_deleted ? '**Branch:** Cleaned up ✅' : '' }}\n\n{{ $json.overall_ok ? '🏁 Pipeline complete.' : 'Fix deploy issues and comment `approve` to retry.' }}"
+        "body": "=## \ud83c\udf89 Production Deployment \u2014 {{ $json.overall_ok ? '\u2705 Complete' : '\u274c Failed' }}\n\n**Deploy:** {{ $json.deploy_ok ? '\u2705' : '\u274c' }} {{ $json.deploy_output }}\n**Smoke test:** {{ $json.smoke_ok ? '\u2705 Passed' : '\u274c Failed' }}\n{{ $json.release_url ? '**Release:** ' + $json.release_url : '' }}\n{{ $json.branch_deleted ? '**Branch:** Cleaned up \u2705' : '' }}\n\n{{ $json.overall_ok ? '\ud83c\udfc1 Pipeline complete.' : 'Fix deploy issues and comment `approve` to retry.' }}"
       }
     },
     {
@@ -1550,7 +1550,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 💻 Dev Agent — Bug Fix {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '✅ Passing' : '❌ Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.pr_url ? '**PR:** ' + $json.pr_url : '' }}\n\n**Next step:** Comment `approve` to deploy."
+        "body": "=## \ud83d\udcbb Dev Agent \u2014 Bug Fix {{ $json.test_passed ? 'Complete' : 'Failed' }}\n\n**Tests:** {{ $json.test_passed ? '\u2705 Passing' : '\u274c Failed' }} ({{ $json.attempts }} attempt(s))\n**Branch:** `{{ $json.branch }}`\n{{ $json.pr_url ? '**PR:** ' + $json.pr_url : '' }}\n\n**Next step:** Comment `approve` to deploy."
       },
       "id": "comment-bug-dev",
       "name": "Comment Bug Dev Result",
@@ -1675,7 +1675,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## 🔍 Review Agent — Code Review\n\n**Verdict:** {{ $json.verdict === 'PASS' ? '✅ PASS' : '❌ FAIL' }}\n\n**Next step:** Comment `approve` to proceed to QA."
+        "body": "=## \ud83d\udd0d Review Agent \u2014 Code Review\n\n**Verdict:** {{ $json.verdict === 'PASS' ? '\u2705 PASS' : '\u274c FAIL' }}\n\n**Next step:** Comment `approve` to proceed to QA."
       },
       "id": "comment-review",
       "name": "Comment Review Result",
@@ -1800,7 +1800,7 @@
         "owner": "={{ $('GitHub Comment Webhook').item.json.body.repository.owner.login }}",
         "repository": "={{ $('GitHub Comment Webhook').item.json.body.repository.name }}",
         "issueNumber": "={{ $('GitHub Comment Webhook').item.json.body.issue.number }}",
-        "body": "=## ✅ QA Agent — Test Report\n\n**Approved:** {{ $json.approved ? '✅ Yes' : '❌ No' }}\n**Stage gate:** {{ $json.stage_gate }}\n\n**Next step:** Comment `approve` to deploy to stage."
+        "body": "=## \u2705 QA Agent \u2014 Test Report\n\n**Approved:** {{ $json.approved ? '\u2705 Yes' : '\u274c No' }}\n**Stage gate:** {{ $json.stage_gate }}\n\n**Next step:** Comment `approve` to deploy to stage."
       },
       "id": "comment-qa",
       "name": "Comment QA Result",
@@ -2005,6 +2005,570 @@
         2100,
         -940
       ]
+    },
+    {
+      "id": "0e6a97d5-d1cd-44ae-a9f1-f75776a28ed4",
+      "name": "Limit? SA Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -1100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "00f64764-e5c6-47a4-bdf3-8f1fe09d92dd",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9d9bb9f7-5068-44f6-9591-3e4d3b7bd001",
+      "name": "Wait SA Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -920
+      ],
+      "webhookId": "91a8963a-ed17-4b35-bff2-cc828dccaba3",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "8d142bb1-2036-4a04-ae80-ea0c04e3131b",
+      "name": "Limit? PM Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -940
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eccc25e3-83b2-4393-ab14-75a86a52f77a",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9ed274aa-bd0c-48e2-bf04-13e3aea6aa75",
+      "name": "Wait PM Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -760
+      ],
+      "webhookId": "5dd3e333-b482-41a8-9551-336cec9a730c",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "f270e80e-bc9b-4699-82ca-53abcf9af48b",
+      "name": "Limit? Dev Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -780
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8343a8a6-ea13-47ec-9972-9c5f4578ce81",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9dff2f0b-6ab0-4450-a74a-b981c3ce1a61",
+      "name": "Wait Dev Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -600
+      ],
+      "webhookId": "626d9063-e81d-4cf5-a247-00b86e4c895f",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "54fb9c9c-539e-4f61-90fe-c18c53e1653b",
+      "name": "Limit? BA Agent (revise)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d9c077d8-74ab-460d-ae0f-b5423a1a23be",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "61795833-efce-4e9c-8306-7761fe26a623",
+      "name": "Wait BA Agent (revise)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        460
+      ],
+      "webhookId": "e9eb89b7-8ab6-4351-8b9e-94a38dc53201",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "376f6de5-9b33-4462-81b8-7c3a3c93474f",
+      "name": "Limit? SA Agent (revise)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1e4897f7-93d0-47f0-8918-f82db72d1749",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "32f621c2-61e1-44b9-8bcf-26c5f6e8e53e",
+      "name": "Wait SA Agent (revise)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        620
+      ],
+      "webhookId": "a740d0c7-b902-46ea-a892-ea5b2d3d736f",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "7b751702-39e5-4d6e-aab5-38f832bb2ff4",
+      "name": "Limit? PM Agent (revise)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d9c1fd28-fbb0-4706-9c47-c8a606d91445",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7a98f809-1071-4c46-9705-a110a13caeeb",
+      "name": "Wait PM Agent (revise)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        780
+      ],
+      "webhookId": "4f9a14ab-2ca3-4cbf-a856-3e590a300cbc",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "ef976641-492d-455d-b79e-71f28bd1c64a",
+      "name": "Limit? Dev Agent (redo)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1660,
+        1180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ef9bb39f-ad9b-4b94-9f10-9c05a7fe35df",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "dce0ca7a-4656-4926-a08e-9dce25894f27",
+      "name": "Wait Dev Agent (redo)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1660,
+        1360
+      ],
+      "webhookId": "7e803570-3d96-42e3-8cf8-18e1f590bf23",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "346cecce-3f08-4394-b785-3eaf8addc8c5",
+      "name": "Limit? Call Deploy Stage Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -140
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f8ba6b63-6f9c-4757-89e3-4a037ec36e89",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2c14af9b-6773-41b6-be67-a22fa63a2950",
+      "name": "Wait Call Deploy Stage Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        40
+      ],
+      "webhookId": "f7c4b4e8-4887-4e1e-9f3a-212976e5ebdf",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "3f3bd9f9-e40e-44de-b75a-ae540ba6e6fd",
+      "name": "Limit? Call Deploy Prod Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        20
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "06116c04-3ed4-4d14-8959-f7fabf8f6694",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d634cb9d-2db2-49fc-8bff-2e59339035cd",
+      "name": "Wait Call Deploy Prod Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        200
+      ],
+      "webhookId": "32f8b96b-f491-4a4b-b8ef-8a48d108cefa",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "ad6514be-d5db-4296-ade7-66586f86afb2",
+      "name": "Limit? Bug Dev Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -1300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ec0e40c9-a9c1-4cfe-b426-4550e60e7f8d",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "92ce6beb-00d9-4a03-bf02-f1bf8458932c",
+      "name": "Wait Bug Dev Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -1120
+      ],
+      "webhookId": "ab563e70-5990-483b-80db-6cc5e674ff35",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "a1ca2011-a9a4-41c8-9c44-6f2b210b630e",
+      "name": "Limit? Review Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -620
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bf980801-8548-4510-a3cc-e1e0551cf37e",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "35b36c5f-dd27-4136-bf88-67a3e9aef4dc",
+      "name": "Wait Review Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -440
+      ],
+      "webhookId": "e87aa27e-9b95-4b83-ac84-f930a5e2666e",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "97fa0aee-e123-4060-bddb-01bb48ba3ef6",
+      "name": "Limit? QA Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dd00c31e-2e63-4b3d-9693-39a04c4fc5b2",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "02a3c81f-0f53-4654-9a1e-2f56726a59e1",
+      "name": "Wait QA Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1900,
+        -280
+      ],
+      "webhookId": "4b063f48-2237-482b-b1c4-6507364afd5b",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
     }
   ],
   "connections": {
@@ -2253,7 +2817,7 @@
       "main": [
         [
           {
-            "node": "Comment Bug Dev Result",
+            "node": "Limit? Bug Dev Agent",
             "type": "main",
             "index": 0
           }
@@ -2308,7 +2872,7 @@
       "main": [
         [
           {
-            "node": "Comment Review Result",
+            "node": "Limit? Review Agent",
             "type": "main",
             "index": 0
           }
@@ -2341,7 +2905,7 @@
       "main": [
         [
           {
-            "node": "Comment QA Result",
+            "node": "Limit? QA Agent",
             "type": "main",
             "index": 0
           }
@@ -2388,7 +2952,7 @@
       "main": [
         [
           {
-            "node": "Comment SA Result",
+            "node": "Limit? SA Agent",
             "type": "main",
             "index": 0
           }
@@ -2410,7 +2974,7 @@
       "main": [
         [
           {
-            "node": "Comment PM Result",
+            "node": "Limit? PM Agent",
             "type": "main",
             "index": 0
           }
@@ -2443,7 +3007,7 @@
       "main": [
         [
           {
-            "node": "Comment Dev Result",
+            "node": "Limit? Dev Agent",
             "type": "main",
             "index": 0
           }
@@ -2465,7 +3029,7 @@
       "main": [
         [
           {
-            "node": "Comment BA Revision",
+            "node": "Limit? BA Agent (revise)",
             "type": "main",
             "index": 0
           }
@@ -2476,7 +3040,7 @@
       "main": [
         [
           {
-            "node": "Comment SA Revision",
+            "node": "Limit? SA Agent (revise)",
             "type": "main",
             "index": 0
           }
@@ -2487,7 +3051,7 @@
       "main": [
         [
           {
-            "node": "Comment PM Revision",
+            "node": "Limit? PM Agent (revise)",
             "type": "main",
             "index": 0
           }
@@ -2498,7 +3062,7 @@
       "main": [
         [
           {
-            "node": "Comment Dev Redo",
+            "node": "Limit? Dev Agent (redo)",
             "type": "main",
             "index": 0
           }
@@ -2564,7 +3128,7 @@
       "main": [
         [
           {
-            "node": "Comment Deploy Stage Result",
+            "node": "Limit? Call Deploy Stage Agent",
             "type": "main",
             "index": 0
           }
@@ -2575,7 +3139,355 @@
       "main": [
         [
           {
+            "node": "Limit? Call Deploy Prod Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? SA Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment SA Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait SA Agent": {
+      "main": [
+        [
+          {
+            "node": "SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? PM Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment PM Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait PM Agent": {
+      "main": [
+        [
+          {
+            "node": "PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Dev Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? BA Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "Wait BA Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment BA Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait BA Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? SA Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "Wait SA Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment SA Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait SA Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "SA Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? PM Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "Wait PM Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment PM Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait PM Agent (revise)": {
+      "main": [
+        [
+          {
+            "node": "PM Agent (revise)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Dev Agent (redo)": {
+      "main": [
+        [
+          {
+            "node": "Wait Dev Agent (redo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Dev Redo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Dev Agent (redo)": {
+      "main": [
+        [
+          {
+            "node": "Dev Agent (redo)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Call Deploy Stage Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Call Deploy Stage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Deploy Stage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Call Deploy Stage Agent": {
+      "main": [
+        [
+          {
+            "node": "Call Deploy Stage Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Call Deploy Prod Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Call Deploy Prod Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Comment Deploy Prod Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Call Deploy Prod Agent": {
+      "main": [
+        [
+          {
+            "node": "Call Deploy Prod Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Bug Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Bug Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Bug Dev Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Bug Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Bug Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Review Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment QA Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait QA Agent": {
+      "main": [
+        [
+          {
+            "node": "QA Agent",
             "type": "main",
             "index": 0
           }
