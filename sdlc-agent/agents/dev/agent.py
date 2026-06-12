@@ -2,7 +2,7 @@ import re
 import logging
 import subprocess
 from shared.claude import ask_claude
-from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state
+from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state, grep_repo_fast
 from shared.session import save_session, load_session
 from agents.dev.prompts import codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt
 
@@ -176,6 +176,22 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     pm_tasks = session.get("pm_output", "")
 
     file_tree = get_file_tree(repo_path)
+    # On very large repos (e.g. Moodle/IOMAD core, ~21k files) dumping the whole
+    # tree into file-selection is unreliable — the model can't reliably pick the
+    # right file, so its SEARCH anchors miss. Narrow to the files the issue/BRD
+    # actually name (by basename) plus keyword grep matches, so the target file is
+    # found and read in full.
+    if len(file_tree) > 800:
+        _text = (issue_description or "") + "\n" + session.get("brd_draft", "") + "\n" + session.get("sdd", "")
+        _basenames = {p.rsplit("/", 1)[-1] for p in re.findall(r'[\w./-]+\.php', _text)}
+        cand = [f for f in file_tree if f.rsplit("/", 1)[-1] in _basenames]
+        _kws = [w.lower() for w in re.findall(r'[A-Za-z]{5,}', issue_title or "")][:6]
+        for f in grep_repo_fast(repo_path, _kws, max_results=60):
+            if f not in cand:
+                cand.append(f)
+        if cand:
+            file_tree = sorted(set(cand))[:150]
+            log.warning("dev: large repo (%s files) narrowed to %d candidate file(s)", "many", len(file_tree))
     file_tree_str = "\n".join(file_tree)
 
     seed_files, affected_files = identify_relevant_files(issue_title, issue_description, repo_path, file_tree)
