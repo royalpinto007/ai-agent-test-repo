@@ -148,6 +148,32 @@ CODEBASE ANALYSIS:
 {codebase_analysis}
 
 Revise the implementation to satisfy the extra instructions while keeping all existing passing tests intact.
-Return the updated implementation in the same format: EDIT (SEARCH/REPLACE) blocks for existing files (SEARCH copied verbatim, minimal edits — never whole-file rewrites) and NEWFILE blocks for new files.
-Also update ## PR Description and ## Summary sections to reflect the changes.
+
+Output your changes in EXACTLY this format (no other format will be parsed):
+
+## Changes
+
+For each existing file you change:
+
+EDIT: <relative path>
+<<<<<<< SEARCH
+<exact lines copied VERBATIM from the current file — enough to be unique>
+=======
+<the replacement lines>
+>>>>>>> REPLACE
+
+For a brand-new file only:
+
+NEWFILE: <relative path>
+```<language>
+<complete file content>
+```
+
+Keep edits minimal — copy the SEARCH text exactly, change only what's needed, never rewrite a whole file.
+
+## PR Description
+**Summary:** what changed and why.
+
+## Summary
+One paragraph on what was revised.
 """

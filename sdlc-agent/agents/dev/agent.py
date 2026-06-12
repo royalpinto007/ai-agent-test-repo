@@ -20,7 +20,8 @@ def parse_output(output):
     they don't touch, eliminating the whole-file-rewrite content loss."""
     ops = []
     for path, search, replace in re.findall(
-            r'EDIT:\s*(.+?)\n<<<<<<< SEARCH\n(.*?)\n=======\n(.*?)\n>>>>>>> REPLACE', output, re.DOTALL):
+            r'EDIT:\s*(.+?)\n[<]{3,}\s*SEARCH\s*\n(.*?)\n[=]{3,}\s*\n(.*?)\n[>]{3,}\s*REPLACE',
+            output, re.DOTALL | re.IGNORECASE):
         path = _clean_path(path)
         if path:
             ops.append({"type": "edit", "path": path, "search": search, "replace": replace})
