@@ -60,6 +60,7 @@ FILE TREE:
 CRITICAL — how to edit:
 - To change an EXISTING file, output a SEARCH/REPLACE edit. The SEARCH block must be copied VERBATIM from the CURRENT FILE CONTENTS above (exact characters, indentation, and enough surrounding lines to be UNIQUE in that file). Only the lines you want to change should differ in REPLACE.
 - NEVER reproduce a whole existing file. Edits must be minimal — touch only what the task needs. Do not delete or rewrite code unrelated to the task.
+- Respect the VERB of the task. If it asks to ADD something (a comment, a function, an option), INSERT new lines and leave existing lines unchanged — your SEARCH and REPLACE should be identical except for the added lines (a pure addition). Only reword or replace existing lines when the task is explicitly to change existing behaviour/wording. Do not "improve" or rephrase existing content that already works.
 - Only use NEWFILE for a file that does not exist yet.
 - Match existing style; handle errors; don't break callers (note signature changes in Impact Analysis).
 
