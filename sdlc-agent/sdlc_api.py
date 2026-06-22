@@ -109,6 +109,25 @@ def _agent_failure(e):
     """
     if isinstance(e, ClaudeUsageLimitError):
         raise e
+    # Post the failure to the issue so a crashed stage is visible, instead of the
+    # milestone silently sitting at "… Working" with no comment (which reads as a
+    # hang). Best-effort: never let comment-posting mask the original error.
+    try:
+        data = request.get_json(silent=True) or {}
+        session = load_session(_sid(data)) or {}
+        owner = data.get("owner") or session.get("owner", "")
+        repo = data.get("repo") or session.get("repo", "")
+        issue_number = data.get("issue_number") or session.get("issue_number")
+        token = os.environ.get("GITHUB_TOKEN", "")
+        stage = (request.path or "").lstrip("/").replace("-agent", "").replace("-", " ").upper() or "A"
+        if owner and repo and issue_number and token:
+            from shared.utils import post_github_comment
+            body = (f"❌ **{stage} stage failed.**\n\n"
+                    f"The pipeline hit an error and stopped here:\n\n```\n{str(e)[:1500]}\n```\n\n"
+                    f"_Fix the cause, then re-trigger this stage (`approve`/`redo-dev:`/`reopen:`)._")
+            post_github_comment(owner, repo, issue_number, body, token)
+    except Exception:
+        app.logger.exception("failed to post failure comment")
     return jsonify({"status": "error", "message": str(e)}), 500
 
 

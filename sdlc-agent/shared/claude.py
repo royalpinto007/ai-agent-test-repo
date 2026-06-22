@@ -82,7 +82,10 @@ AGENTIC_ALLOWED_TOOLS = os.environ.get(
     "Bash Read Edit Write Grep Glob mcp__dolibarr_expert",
 ).strip()
 AGENTIC_MCP_CONFIG = os.environ.get("DOLIBARR_DEV_MCP_CONFIG", "").strip()
-AGENTIC_TIMEOUT = int(os.environ.get("DOLIBARR_DEV_TIMEOUT", "0") or "0")
+# Wall-clock cap for one agentic run (seconds). Default 1800 (30 min) so a true
+# hang dies cleanly instead of stalling the stage forever; raise it for genuinely
+# long tasks. 0 disables the cap.
+AGENTIC_TIMEOUT = int(os.environ.get("DOLIBARR_DEV_TIMEOUT", "1800") or "1800")
 # Headless permission posture. The skill needs Bash (its scan/db/log scripts) and
 # the MCP, which a non-interactive `claude -p` can only use under an explicit
 # permission mode. This defaults to "acceptEdits" (auto-applies file edits only);
@@ -162,14 +165,22 @@ def _run_claude(cmd, prompt, cwd=None, timeout=None):
     shared by the text-mode and agentic paths. Returns raw stdout (stripped)."""
     attempts = 0
     while True:
-        result = subprocess.run(
-            cmd,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            timeout=timeout or None,
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=timeout or None,
+            )
+        except subprocess.TimeoutExpired:
+            # A hung agentic run must fail loudly, not block the stage forever.
+            log.error("claude run exceeded timeout of %ss; aborting.", timeout)
+            raise RuntimeError(
+                f"claude run timed out after {timeout}s (no response). "
+                f"If this is a genuinely long task, raise DOLIBARR_DEV_TIMEOUT."
+            )
         if result.returncode == 0:
             return result.stdout.strip()
 

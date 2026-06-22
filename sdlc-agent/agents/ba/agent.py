@@ -197,28 +197,56 @@ def _detect_ui_needed(requirement):
     return bool(m and m.group(1).lower() == "yes")
 
 
-def _detect_component(requirement):
-    """Map the issue form's 'Affected component' choice to a registered code repo.
+def _repo_target(slug, cfg):
+    return {
+        "slug": slug,
+        "repo_path": cfg.get("repo_path", ""),
+        "test_command": cfg.get("test_command"),
+        "main_branch": cfg.get("main_branch", "main"),
+        "dev_mode": cfg.get("dev_mode"),
+        "skill": cfg.get("skill"),
+        "dol_htdocs": cfg.get("dol_htdocs"),
+        "mcp_config": cfg.get("mcp_config"),
+    }
 
-    Returns a target_repo dict ({slug, repo_path, test_command, main_branch}) so
-    Dev/Review run against — and open the PR in — that repo, or None when the
-    requester left it unset / 'not sure' (then PM decides as before).
+
+def _detect_component(requirement):
+    """Resolve which registered code repo a requirement targets, so Dev/Review run
+    against — and open the PR in — that repo. Returns a target_repo dict or None
+    (None => PM decides).
+
+    Two signals, in order:
+    1. An explicit 'Affected component' issue-form field, if the template has one.
+    2. Fallback: a known code-repo slug named anywhere in the issue text. The
+       simplified templates dropped the component dropdown, so a requirement that
+       names its module/repo in prose (e.g. 'dolibarr_custom_advancetools') should
+       still route. Prefer the LONGEST matching short-name so a specific module
+       wins over a generic parent like 'dolibarr'.
     """
     import re
-    m = re.search(r'affected component[^\n]*\n+\s*([^\n]+)', requirement or "", re.IGNORECASE)
-    if not m:
-        return None
-    val = m.group(1).strip().strip("`").lower()
-    if not val or val.startswith(("not sure", "none", "n/a", "_no response_", "unsure")):
-        return None
-    for slug, cfg in get_code_repos().items():
-        if slug.split("/")[-1].lower() == val:
-            return {
-                "slug": slug,
-                "repo_path": cfg.get("repo_path", ""),
-                "test_command": cfg.get("test_command"),
-                "main_branch": cfg.get("main_branch", "main"),
-            }
+    req = requirement or ""
+    repos = get_code_repos()
+
+    m = re.search(r'affected component[^\n]*\n+\s*([^\n]+)', req, re.IGNORECASE)
+    if m:
+        val = m.group(1).strip().strip("`").lower()
+        if val and not val.startswith(("not sure", "none", "n/a", "_no response_", "unsure")):
+            for slug, cfg in repos.items():
+                if slug.split("/")[-1].lower() == val:
+                    return _repo_target(slug, cfg)
+
+    rl = req.lower()
+    best = None
+    for slug, cfg in repos.items():
+        short = slug.split("/")[-1].lower()
+        if not short:
+            continue
+        # whole-token match: '-'/'_'/word chars on either side don't count as a boundary
+        if re.search(r'(?<![\w-])' + re.escape(short) + r'(?![\w-])', rl):
+            if best is None or len(short) > len(best[0].split("/")[-1]):
+                best = (slug, cfg)
+    if best:
+        return _repo_target(*best)
     return None
 
 
