@@ -1,10 +1,13 @@
 import re
 import logging
 import subprocess
-from shared.claude import ask_claude
+from shared.claude import ask_claude, ask_claude_agentic
 from shared.utils import get_file_tree, read_file, write_file, run_git, run_tests, identify_relevant_files, create_pull_request, check_pr_file_overlap, get_github_issue_state, grep_repo_fast
 from shared.session import save_session, load_session
-from agents.dev.prompts import codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt
+from agents.dev.prompts import (
+    codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt,
+    agentic_implementation_prompt, agentic_retry_prompt,
+)
 
 MAX_RETRIES = 3
 log = logging.getLogger("dev")
@@ -177,6 +180,19 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
         branch_name = f"ai/{issue_number}-{slug}"
     test_command = test_command or session.get("test_command")
     pm_tasks = session.get("pm_output", "")
+
+    # Agentic (skill-driven) path — opt-in per repo via repos.json
+    # ("dev_mode": "agentic"). Used for the Dolibarr/Thrive code repo so the
+    # dolibarr-dev skill drives the change with tools + MCP against the live
+    # install, instead of pasting whole files into a text-only prompt. Any repo
+    # without this flag (e.g. the Moodle/IOMAD acorn repos) keeps the text path
+    # below unchanged.
+    if _is_agentic(target_repo):
+        return _run_agentic(
+            session_id, issue_title, issue_description, repo_path, branch_name,
+            main_branch, test_command, pm_tasks, redo_instructions,
+            target_repo if isinstance(target_repo, dict) else {},
+        )
 
     file_tree = get_file_tree(repo_path)
     # On very large repos (e.g. Moodle/IOMAD core, ~21k files) dumping the whole
@@ -500,4 +516,147 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     }
 
     save_session(session_id, {**result, "stage": "dev", "repo_path": repo_path, "dev_raw_output": output, "main_branch": main_branch})
+    return result
+
+
+# ── Agentic (skill-driven) Dev path ─────────────────────────────────────────
+
+def _is_agentic(target_repo):
+    """A repo opts into the tool-enabled dolibarr-dev path with
+    {"dev_mode": "agentic"} (or "skill": "dolibarr-dev") in repos.json."""
+    if not isinstance(target_repo, dict):
+        return False
+    return target_repo.get("dev_mode") == "agentic" or bool(target_repo.get("skill"))
+
+
+def _changed_paths(repo_path):
+    """Files modified/added in the working tree (the agent's edits), from
+    `git status --porcelain`. Handles renames (takes the new path)."""
+    r = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path,
+                       capture_output=True, text=True)
+    paths = []
+    for line in r.stdout.splitlines():
+        if not line.strip():
+            continue
+        p = line[3:]
+        if " -> " in p:
+            p = p.split(" -> ", 1)[1]
+        paths.append(p.strip().strip('"'))
+    return sorted(set(paths))
+
+
+def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_name,
+                 main_branch, test_command, pm_tasks, redo_instructions, target_repo):
+    """Tool-enabled implementation: Claude works directly in a checked-out branch
+    using the dolibarr-dev skill, then the pipeline commits/pushes/opens the PR
+    from the resulting working-tree diff. Mirrors the text path's commit/PR tail."""
+    extra_dirs = [d for d in [target_repo.get("dol_htdocs")] if d]
+    mcp_config = target_repo.get("mcp_config") or None
+
+    # Fresh branch off main so the working-tree diff IS the change.
+    run_git(["checkout", main_branch], cwd=repo_path)
+    run_git(["pull"], cwd=repo_path)
+    try:
+        run_git(["branch", "-D", branch_name], cwd=repo_path)
+    except RuntimeError:
+        pass
+    run_git(["checkout", "-b", branch_name], cwd=repo_path)
+
+    prompt = agentic_implementation_prompt(issue_title, issue_description, pm_tasks, redo_instructions)
+    output = ask_claude_agentic(prompt, cwd=repo_path, mcp_config=mcp_config, extra_dirs=extra_dirs)
+
+    changed = _changed_paths(repo_path)
+    attempts = 1
+
+    def _lint_and_test(changed_now):
+        from shared import lint
+        applied_content = {}
+        for p in changed_now:
+            c = read_file(repo_path, p)
+            if c is not None:
+                applied_content[p] = c
+        def _orig(p):
+            r = subprocess.run(["git", "show", f"{main_branch}:{p}"], cwd=repo_path,
+                               capture_output=True, text=True)
+            return r.stdout if r.returncode == 0 else None
+        problems = lint.lint_changed(_orig, applied_content) if applied_content else []
+        passed, out = run_tests(repo_path, test_command)
+        return problems, passed, out
+
+    lint_problems, test_passed, test_output = ([], True, "") if not changed else _lint_and_test(changed)
+
+    # One agentic retry on test failure — let the skill self-correct in place.
+    if changed and not test_passed and MAX_RETRIES > 1:
+        output = ask_claude_agentic(
+            agentic_retry_prompt(issue_title, test_output),
+            cwd=repo_path, mcp_config=mcp_config, extra_dirs=extra_dirs,
+        )
+        attempts += 1
+        changed = _changed_paths(repo_path)
+        if changed:
+            lint_problems, test_passed, test_output = _lint_and_test(changed)
+
+    impact, pr_description, summary = parse_output(output)[1:]
+
+    base_session = {
+        "stage": "dev", "repo_path": repo_path, "branch": branch_name,
+        "issue_title": issue_title, "dev_raw_output": output,
+        "files_changed": changed, "attempts": attempts, "main_branch": main_branch,
+    }
+
+    if not changed:
+        save_session(session_id, {**base_session, "test_passed": False})
+        return {"branch": branch_name, "issue_title": issue_title, "test_passed": False,
+                "files_changed": [], "attempts": attempts,
+                "error": "Dev (agentic) produced no working-tree changes. Re-run dev or use `redo-dev: <instructions>`.",
+                "next_stage": "dev (no files generated)"}
+
+    if not test_passed:
+        save_session(session_id, {**base_session, "test_passed": False, "test_output": test_output})
+        return {"branch": branch_name, "issue_title": issue_title, "test_passed": False,
+                "test_output": test_output, "attempts": attempts,
+                "error": f"Tests failed after {attempts} attempt(s). Use `redo-dev: <instructions>` to fix, or check the branch manually.",
+                "next_stage": "dev (tests failed)"}
+
+    if lint_problems:
+        save_session(session_id, {**base_session, "test_passed": True})
+        return {"branch": branch_name, "issue_title": issue_title, "test_passed": True,
+                "files_changed": changed, "attempts": attempts,
+                "error": ("Change introduces new syntax/coding-standard errors that would fail CI: "
+                          + "; ".join(f"{p}: {why}" for p, why in lint_problems)
+                          + ". Use `redo-dev: <instructions>` to fix."),
+                "next_stage": "dev (lint failed)"}
+
+    run_git(["add", "-A"], cwd=repo_path)
+    commit_result = subprocess.run(
+        ["git", "commit", "-m", f"feat: {issue_title} (agentic, tests: {'pass' if test_passed else 'fail'})"],
+        cwd=repo_path, capture_output=True, text=True,
+    )
+    _commit_out = commit_result.stdout + commit_result.stderr
+    _benign = ("nothing to commit", "no changes added to commit", "nothing added to commit")
+    if commit_result.returncode != 0 and not any(b in _commit_out for b in _benign):
+        raise RuntimeError(f"git commit failed: {_commit_out.strip()}")
+    run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
+
+    issue_number = session_id.split("-")[-1] if "-" in session_id else None
+    pr_url = pr_error = None
+    try:
+        pr_url = create_pull_request(repo_path, branch_name, issue_title, issue_number, pr_description, summary, main_branch)
+    except RuntimeError as e:
+        pr_error = str(e)
+
+    import os as _os
+    token = _os.environ.get("GITHUB_TOKEN", "")
+    conflicting_prs = check_pr_file_overlap(repo_path, branch_name, token)
+
+    result = {
+        "branch": branch_name, "issue_title": issue_title,
+        "impact_analysis": impact, "pr_description": pr_description, "summary": summary,
+        "files_changed": changed,
+        "test_files": [p for p in changed if "test" in p.lower() or "spec" in p.lower()],
+        "test_passed": test_passed, "test_output": test_output, "attempts": attempts,
+        "pr_url": pr_url, "pr_error": pr_error, "conflicting_prs": conflicting_prs,
+        "next_stage": "review",
+    }
+    save_session(session_id, {**result, **base_session, "test_passed": test_passed})
     return result

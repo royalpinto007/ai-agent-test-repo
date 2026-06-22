@@ -107,6 +107,51 @@ One paragraph: what was built, key decisions, what was verified.
 """
 
 
+def agentic_implementation_prompt(issue_title, issue_description, pm_tasks=None, redo_instructions=None):
+    """Prompt for the tool-enabled Dolibarr/Thrive Dev path. Claude has the
+    dolibarr-dev skill + file tools + the dolibarr_expert MCP, and works directly
+    in the checked-out module. No files are pasted in — the skill scans what it
+    needs, which is the whole point (lean context, live verification)."""
+    pm_section = f"\n\nPLAN / TASK DETAIL FROM PM:\n{pm_tasks}" if pm_tasks else ""
+    redo_section = f"\n\nEXTRA INSTRUCTIONS FROM REVIEWER (address these):\n{redo_instructions}" if redo_instructions else ""
+    return f"""You are the Dev stage of an automated pipeline, implementing one issue in a live Dolibarr/Thrive codebase. Your current working directory is a fresh feature branch already checked out for you.
+
+**Use the `dolibarr-dev` skill** — follow its Step 0 (read LEARNINGS, the module brain, scan existing code/DB before writing) and its plan-first, reuse-first, security, and prove-it discipline. Scan with the skill's helper scripts and the dolibarr_expert MCP rather than reading whole files; keep your context lean.
+
+TASK: {issue_title}
+
+{issue_description}{pm_section}{redo_section}
+
+Rules for this automated run:
+- Implement the smallest correct change that satisfies the task. Match existing Dolibarr conventions exactly (mirror real code; reuse before rewriting).
+- Edit files **in place** in the working directory with your file tools. Do NOT run `git add`, `git commit`, `git push`, `git checkout`, or create branches — the pipeline commits, pushes, and opens the PR from your working-tree changes.
+- Verify behaviour the skill's way where you can (drive the flow / read the log / check the DB), but do not start long-running servers or background processes.
+- If a schema/descriptor change needs a module reactivation to take effect, note it in the PR description rather than reactivating in this run.
+
+When you are done editing, output ONLY the following two sections as your final message (everything above was tool work):
+
+## PR Description
+**Summary:** what changed and why (2-3 sentences).
+**Files changed:** bullet list of the files you edited/created.
+**How to test:** steps a reviewer can follow to verify it.
+
+## Summary
+One paragraph: what was built, which existing functions/mechanisms you reused, what you verified, and whether a module reactivation is needed.
+"""
+
+
+def agentic_retry_prompt(issue_title, test_output):
+    return f"""The change you just made to this Dolibarr/Thrive working tree FAILED the automated tests.
+
+TASK: {issue_title}
+
+TEST OUTPUT:
+{test_output}
+
+Using the dolibarr-dev skill and your file tools, diagnose the ROOT cause (not just the failing assertion) and fix it in place in the working directory. Keep the change minimal and do not run any git commands. When done, output ONLY the `## PR Description` and `## Summary` sections as before.
+"""
+
+
 def retry_prompt(issue_title, previous_output, test_output, attempt, codebase_analysis):
     return f"""You are a senior software engineer. Your implementation attempt {attempt} failed automated tests.
 
