@@ -196,7 +196,7 @@ A UI change was requested for this feature. Produce a single self-contained HTML
 
 MATCH THE LENGTH OF YOUR OUTPUT TO THE SIZE OF THE CHANGE. This is the most important rule:
 - A simple Config or Workaround (e.g. flip one admin setting) needs only a few lines: what it is, the exact steps, and the tier. Then STOP. Do not invent Out of Scope, exhaustive test cases, or multiple open questions for a one-setting change — padding a trivial ask into a feature spec wastes the reader's time.
-- Only a genuine new feature or non-trivial code change earns the full breakdown (detailed acceptance criteria, out-of-scope, positive/negative test cases, open questions).
+- Only a genuine new feature or non-trivial code change earns the full breakdown (detailed acceptance criteria, positive/negative test cases, open questions).
 When in doubt, err on the side of shorter.
 
 {_STACK_DETECTION_RULES}
@@ -242,10 +242,7 @@ Chosen tier: Config / Workaround / Code change — [one line reason, cite a path
 [one line]
 
 ### Acceptance Criteria
-- [ ] [criterion] (max 6, testable, include error cases)
-
-### Out of Scope
-- [item] (max 4 — omit if none)
+- [ ] [criterion] (max 6, testable, include error cases — these double as the expected-behaviour flows)
 
 ### Test Cases
 **Positive (should work):**
