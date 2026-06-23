@@ -77,9 +77,12 @@ def _claude_cmd():
 #
 # Allowed tools and the MCP-server config are configurable via env so the box can
 # tune them without a code change. Defaults match what the dolibarr-dev skill needs.
+# NOTE: `Skill` MUST be in the allowlist or the model cannot invoke the
+# dolibarr-dev skill at all (skills are model-invoked via the Skill tool); without
+# it the agent silently falls back to plain Read/Edit and the skill stays inert.
 AGENTIC_ALLOWED_TOOLS = os.environ.get(
     "DOLIBARR_DEV_ALLOWED_TOOLS",
-    "Bash Read Edit Write Grep Glob mcp__dolibarr_expert",
+    "Bash Read Edit Write Grep Glob Skill mcp__dolibarr_expert",
 ).strip()
 AGENTIC_MCP_CONFIG = os.environ.get("DOLIBARR_DEV_MCP_CONFIG", "").strip()
 # Wall-clock cap for one agentic run (seconds). Default 1800 (30 min) so a true

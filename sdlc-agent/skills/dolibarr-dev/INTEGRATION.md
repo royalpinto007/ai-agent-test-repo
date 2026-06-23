@@ -50,8 +50,9 @@ Moodle/IOMAD (acorn) repos are untouched and keep the text path.
    ```
    # MCP config (or set per-repo "mcp_config" as above)
    DOLIBARR_DEV_MCP_CONFIG=/etc/sdlc-agent/dolibarr-mcp.json
-   # Tools the agent may use (default below)
-   DOLIBARR_DEV_ALLOWED_TOOLS=Bash Read Edit Write Grep Glob mcp__dolibarr_expert
+   # Tools the agent may use (default below). `Skill` is REQUIRED — without it the
+   # model cannot invoke the dolibarr-dev skill and silently falls back to plain edits.
+   DOLIBARR_DEV_ALLOWED_TOOLS=Bash Read Edit Write Grep Glob Skill mcp__dolibarr_expert
    # Headless permission posture. Default acceptEdits + the Bash allowlist runs the
    # skill's scripts without prompting. Set to bypassPermissions ONLY if you want
    # fully-unattended arbitrary command execution (operator's explicit choice).
