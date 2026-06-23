@@ -1,0 +1,4921 @@
+{
+  "updatedAt": "2026-06-12T07:27:45.833Z",
+  "createdAt": "2026-05-10T11:28:13.207Z",
+  "id": "LJPESeFKy5wd8SL8",
+  "name": "SDLC - 1. Start Pipeline (New Issue)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sdlc-start",
+        "options": {}
+      },
+      "id": "18642515-fc6c-4a2c-b577-d158e984b371",
+      "name": "GitHub Issue Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        7088,
+        4784
+      ],
+      "webhookId": "sdlc-start"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.action === 'assigned' && $json.body.assignee?.login === 'agent-accellier' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3d6a4a36-e568-4042-8251-92f4ccc4d2ce",
+      "name": "IF Issue Opened",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        7312,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ (() => { const i = $json.body.issue || {}; const labs = (i.labels || []).map(l => (l.name||'').toLowerCase()); const t = i.title || ''; if (i.type && i.type.name) return i.type.name; if (labs.includes('bug') || /^\\s*\\[bug\\]/i.test(t)) return 'Bug'; if (labs.includes('feature') || /^\\s*\\[feature\\]/i.test(t)) return 'Feature'; return ''; })() }}",
+                    "rightValue": "Bug",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Bug"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ (() => { const i = $json.body.issue || {}; const labs = (i.labels || []).map(l => (l.name||'').toLowerCase()); const t = i.title || ''; if (i.type && i.type.name) return i.type.name; if (labs.includes('bug') || /^\\s*\\[bug\\]/i.test(t)) return 'Bug'; if (labs.includes('feature') || /^\\s*\\[feature\\]/i.test(t)) return 'Feature'; return ''; })() }}",
+                    "rightValue": "Feature",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Feature"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "8bbb0bc8-8498-4177-ab77-c5ffb22fe08b",
+      "name": "Route by Issue Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        7536,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Bug Analysis Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "9327251a-28f6-4ee5-a277-e281a352b4eb",
+      "name": "Set Milestone Bug Analysis Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7744,
+        4576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "requirement",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+            },
+            {
+              "name": "issue_type",
+              "value": "Bug"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "21666046-0f11-4446-bdee-42d77ca18969",
+      "name": "BA Agent (Bug)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7904,
+        4576
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
+        "body": "=## 🐛 BA Agent — Bug Analysis\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the analysis below, then comment `approve` to proceed to Dev.\n\n---\n\n{{ $json.brd }}"
+      },
+      "id": "055e272b-d419-4ce0-ae16-44e66541024e",
+      "name": "Comment Bug Analysis",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        8064,
+        4576
+      ],
+      "webhookId": "792b6035-d61b-448a-b552-1b1aa1258e52",
+      "credentials": {
+        "githubApi": {
+          "id": "6eBqkLVAlKwmRlRE",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Bug Analysis Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "cd03a613-c070-4cdc-94de-c07784a7a646",
+      "name": "Set Milestone Bug Analysis Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8224,
+        4576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BRD Working"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f15e9cef-5abe-419f-8a07-4a19c25a6729",
+      "name": "Set Milestone BRD Working",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7744,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "requirement",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+            },
+            {
+              "name": "issue_type",
+              "value": "Feature"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "b0a01bd5-4c96-40d7-9b38-f23fa549a75b",
+      "name": "BA Agent (Feature)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7904,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
+        "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
+        "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
+        "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Resolution tier:** {{ $json.resolution_tier === 'config' ? '⚙️ Config — no code change needed' : ($json.resolution_tier === 'workaround' ? '🔧 Workaround — use existing features differently' : '💻 Code change required') }}\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+      },
+      "id": "7f2f8962-c008-482c-97d8-7a51d287a4fd",
+      "name": "Comment BRD on Issue",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        8064,
+        4784
+      ],
+      "webhookId": "cebd53a8-5261-4641-80d0-5669528d6176",
+      "credentials": {
+        "githubApi": {
+          "id": "6eBqkLVAlKwmRlRE",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "BRD Awaiting Approval"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a690a80c-338f-46a8-8324-8496017452c4",
+      "name": "Set Milestone BRD Awaiting Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8224,
+        4784
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const title = $input.item.json.body.issue.title || '';\nconst m = title.match(/^\\[(BA|SA|PM|Dev|Review|QA|Deploy)\\]/);\nconst prefix = m ? m[1] : null;\nreturn [{ json: { ...$input.item.json, task_prefix: prefix } }];"
+      },
+      "id": "cf2bf7f4-5791-49f8-bd99-d70a01c1dd8d",
+      "name": "Detect Task Prefix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7744,
+        4976
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Assigned"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c6dd1428-067c-4acb-bfb2-9de58056efac",
+      "name": "Set Milestone Task Assigned",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7904,
+        4976
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "BA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "BA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "SA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "SA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "PM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "PM"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Dev",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Dev"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Review"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "QA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "QA"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.task_prefix }}",
+                    "rightValue": "Deploy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "Deploy"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7f17e05b-f291-4112-98ee-b6a5d4101e97",
+      "name": "Switch Task Prefix",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        8064,
+        4976
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/ba-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"issue_type\": \"Task\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "5c4d8da8-1beb-4107-91e5-227a8e106764",
+      "name": "Task BA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/sa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "3fc3fe1b-7354-4e27-baab-cda06311edf6",
+      "name": "Task SA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        4944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/pm-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "7d279f5f-5a2e-4b93-ba15-3f7b8f4452cd",
+      "name": "Task PM Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        5024
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/dev-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "6ba8ca89-07a9-4593-88db-ad4545416407",
+      "name": "Task Dev Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        5104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "3764a424-adb7-4e94-a87f-4f0e53542858",
+      "name": "Task Review Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        5184
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "48570200-277e-43a0-9543-47ea741d634e",
+      "name": "Task QA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/deploy-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"env\": \"stage\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "67c1aab2-b626-485f-86a5-c311f96a05a7",
+      "name": "Task Deploy Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8288,
+        5344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/review-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "f778fc54-1291-4db1-8166-c169d5a1c094",
+      "name": "Task Dev → Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        5104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "09f62836-2a8c-4a74-9522-5f6a238c1faf",
+      "name": "Task Dev → QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8656,
+        5104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/qa-agent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+        "options": {
+          "timeout": 21600000
+        }
+      },
+      "id": "90cde9e5-833c-42ab-8d27-0505b886f5e2",
+      "name": "Task Review → QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        5184
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5cf0a2ef-84c5-4649-a4a3-61056ab4fdeb",
+      "name": "Set Milestone Task Complete (BA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "8ed25bc8-e908-44b8-9874-b9468c867a54",
+      "name": "Set Milestone Task Complete (SA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        4944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "97bd023c-1c03-4d52-95a3-ab488951eead",
+      "name": "Set Milestone Task Complete (PM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        5024
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "0cd02dc1-15b7-4d8b-a56e-15ce0a7c8985",
+      "name": "Set Milestone Task Complete (Dev)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8832,
+        5104
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "72a59274-b0b2-4b41-b31c-1f974f454e04",
+      "name": "Set Milestone Task Complete (Review)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8656,
+        5184
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d69736d1-5804-4b2c-8328-f80f2bcd1577",
+      "name": "Set Milestone Task Complete (QA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.68.103.135:5001/set-milestone",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "owner",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+            },
+            {
+              "name": "repo",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+            },
+            {
+              "name": "issue_number",
+              "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+            },
+            {
+              "name": "milestone_title",
+              "value": "Task: Complete"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "9a4932db-1a60-445e-9833-a7eb2b4be9a9",
+      "name": "Set Milestone Task Complete (Deploy)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8464,
+        5344
+      ]
+    },
+    {
+      "id": "0b59786d-9995-4b07-86d9-4ad2447b101c",
+      "name": "Limit? BA Agent (Bug)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8124,
+        4576
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "543922cb-307d-4c41-85e8-927817abb19f",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8b43125e-f016-465b-a800-3cd54a801f1a",
+      "name": "Wait BA Agent (Bug)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8124,
+        4756
+      ],
+      "webhookId": "cff2ddf1-d9b1-40a8-8ba5-bff484886d5f",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "d241ba8b-c94d-4a62-b8f0-c0ac52843e09",
+      "name": "Limit? BA Agent (Feature)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8124,
+        4784
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d0674b79-4c3f-443c-b6e4-08b58216467a",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "17b4cd79-3cf8-4020-9358-bbf9fdddab5f",
+      "name": "Wait BA Agent (Feature)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8124,
+        4964
+      ],
+      "webhookId": "1a56e4ee-17f7-4a44-9e66-ea222ba03da4",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "b5ccce2a-62ec-41a7-8106-8e6f62e0b521",
+      "name": "Limit? Task BA Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        4864
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "96b2e486-6f3d-44f6-a866-b1141a9eac9d",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "17dd64af-cd3e-485f-bc99-778806a9ff78",
+      "name": "Wait Task BA Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5044
+      ],
+      "webhookId": "d4a33119-0a5a-4970-a2df-e928b9a89299",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "078e2e40-f027-4cf7-9b65-be9bf5beaf02",
+      "name": "Limit? Task SA Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        4944
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "250bbb7e-d478-4591-a5a4-1cecab969a57",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d2988669-efe0-479e-8a08-d18363e432ee",
+      "name": "Wait Task SA Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5124
+      ],
+      "webhookId": "d2fc7cd2-9723-45d3-b760-98a0fe600097",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "d7cf92f0-73ab-4c8e-afb2-2920f85cdbe5",
+      "name": "Limit? Task PM Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        5024
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3f846532-c1ee-42e4-aea0-19083faf5989",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2923fba5-f1e8-49a0-b7a6-fa2588c16825",
+      "name": "Wait Task PM Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5204
+      ],
+      "webhookId": "25b869fe-a5ce-45ba-8f44-1df3b0d56440",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "866d0f8b-0c3d-4e57-910a-c21d3c33a8a5",
+      "name": "Limit? Task Dev Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        5104
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "de39280f-4213-4c75-8e35-f0be72663f76",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "47e7d589-270b-4086-8614-8d0116d8625c",
+      "name": "Wait Task Dev Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5284
+      ],
+      "webhookId": "1039b460-6af3-4f9b-9d0f-eff735a37d5b",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "52a74297-f91f-4c8a-b50b-aaf42e2604b4",
+      "name": "Limit? Task Review Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        5184
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3e8fd014-d1d2-4d20-81b2-245de208b531",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c2048655-c1ee-4829-8fbd-3e198d844967",
+      "name": "Wait Task Review Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5364
+      ],
+      "webhookId": "7e641ade-eb30-4070-9204-238d9068a061",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "ac143278-c9d0-4f03-94fd-1020c690ca7d",
+      "name": "Limit? Task QA Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        5264
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "61f01efa-e5e5-4a08-90b6-47197e683691",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1b2c838b-2864-4c4f-8873-052b77586812",
+      "name": "Wait Task QA Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5444
+      ],
+      "webhookId": "47511261-56b1-48bf-82ec-9694af516141",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "3672b94e-6033-4be2-afa8-937ab82230bd",
+      "name": "Limit? Task Deploy Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8508,
+        5344
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "96374100-08a6-4673-9cfd-301a17c983e9",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a3c6fc64-3e32-4285-b5b9-e039978c1572",
+      "name": "Wait Task Deploy Agent",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8508,
+        5524
+      ],
+      "webhookId": "ad0e23a6-d92e-45b1-a312-d2412293f351",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "121338c4-497e-446f-80e3-673896c89020",
+      "name": "Limit? Task Dev → Review",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8684,
+        5104
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4a99e0a1-c074-40c8-b620-0a55ff3db887",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "31d7999a-af5e-453d-93af-60ed29ba0c1b",
+      "name": "Wait Task Dev → Review",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8684,
+        5284
+      ],
+      "webhookId": "b231b85f-3225-43c3-a158-48331156a064",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "2d592b83-d3f0-473b-9ec3-9f38dbc91286",
+      "name": "Limit? Task Dev → QA",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8876,
+        5104
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c53717f3-5e59-4d4c-b70c-daa39a914672",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b75f5c9a-e56d-4e93-8b08-63d246ece7f3",
+      "name": "Wait Task Dev → QA",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8876,
+        5284
+      ],
+      "webhookId": "2ca24fc3-9d27-4ab8-8bd0-37c21b5b23ea",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "c1907044-ff29-4017-b2e9-5f9e9a341a5c",
+      "name": "Limit? Task Review → QA",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8684,
+        5184
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "086d174f-da12-4a2d-b642-e0bcc3fc20f1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "rate_limited",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1d787ff8-3c81-4b0e-b492-d4639efe9ea7",
+      "name": "Wait Task Review → QA",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8684,
+        5364
+      ],
+      "webhookId": "34d945f1-f12b-49f8-8792-8818dc4e9085",
+      "parameters": {
+        "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+        "unit": "seconds"
+      }
+    }
+  ],
+  "connections": {
+    "GitHub Issue Webhook": {
+      "main": [
+        [
+          {
+            "node": "IF Issue Opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Issue Opened": {
+      "main": [
+        [
+          {
+            "node": "Route by Issue Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Issue Type": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Bug Analysis Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone BRD Working",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detect Task Prefix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Bug Analysis Working": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BA Agent (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Limit? BA Agent (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment Bug Analysis": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Bug Analysis Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone BRD Working": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (Feature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BA Agent (Feature)": {
+      "main": [
+        [
+          {
+            "node": "Limit? BA Agent (Feature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment BRD on Issue": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone BRD Awaiting Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Task Prefix": {
+      "main": [
+        [
+          {
+            "node": "Set Milestone Task Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Milestone Task Assigned": {
+      "main": [
+        [
+          {
+            "node": "Switch Task Prefix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Task Prefix": {
+      "main": [
+        [
+          {
+            "node": "Task BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Deploy Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task BA Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task SA Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task PM Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev → Review": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Dev → Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Dev → QA": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Dev → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Review → QA": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Review → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Deploy Agent": {
+      "main": [
+        [
+          {
+            "node": "Limit? Task Deploy Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? BA Agent (Bug)": {
+      "main": [
+        [
+          {
+            "node": "Wait BA Agent (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment Bug Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait BA Agent (Bug)": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (Bug)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? BA Agent (Feature)": {
+      "main": [
+        [
+          {
+            "node": "Wait BA Agent (Feature)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Comment BRD on Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait BA Agent (Feature)": {
+      "main": [
+        [
+          {
+            "node": "BA Agent (Feature)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task BA Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (BA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task BA Agent": {
+      "main": [
+        [
+          {
+            "node": "Task BA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task SA Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (SA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task SA Agent": {
+      "main": [
+        [
+          {
+            "node": "Task SA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task PM Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (PM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task PM Agent": {
+      "main": [
+        [
+          {
+            "node": "Task PM Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Dev → Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Dev Agent": {
+      "main": [
+        [
+          {
+            "node": "Task Dev Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Review → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Review Agent": {
+      "main": [
+        [
+          {
+            "node": "Task Review Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (QA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task QA Agent": {
+      "main": [
+        [
+          {
+            "node": "Task QA Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Deploy Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Deploy Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (Deploy)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Deploy Agent": {
+      "main": [
+        [
+          {
+            "node": "Task Deploy Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Dev → Review": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Dev → Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Task Dev → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Dev → Review": {
+      "main": [
+        [
+          {
+            "node": "Task Dev → Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Dev → QA": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Dev → QA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (Dev)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Dev → QA": {
+      "main": [
+        [
+          {
+            "node": "Task Dev → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit? Task Review → QA": {
+      "main": [
+        [
+          {
+            "node": "Wait Task Review → QA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Milestone Task Complete (Review)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Task Review → QA": {
+      "main": [
+        [
+          {
+            "node": "Task Review → QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+  "activeVersionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+  "versionCounter": 88,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-10T11:28:13.210Z",
+      "createdAt": "2026-05-10T11:28:13.210Z",
+      "role": "workflow:owner",
+      "workflowId": "LJPESeFKy5wd8SL8",
+      "projectId": "wbiBpXswiIxZ2xXc",
+      "project": {
+        "updatedAt": "2026-05-09T17:32:42.103Z",
+        "createdAt": "2026-05-09T11:17:25.467Z",
+        "id": "wbiBpXswiIxZ2xXc",
+        "name": "Accellier Support <support@accellier.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "d611e843-bf77-4165-b4ec-70b055c28585"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "updatedAt": "2026-05-10T11:28:10.870Z",
+      "createdAt": "2026-05-10T11:28:10.870Z",
+      "id": "FOovz7BrpXIp86gr",
+      "name": "sdlc"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-06-12T07:27:45.835Z",
+    "createdAt": "2026-06-12T07:27:45.835Z",
+    "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+    "workflowId": "LJPESeFKy5wd8SL8",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "sdlc-start",
+          "options": {}
+        },
+        "id": "18642515-fc6c-4a2c-b577-d158e984b371",
+        "name": "GitHub Issue Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          7088,
+          4784
+        ],
+        "webhookId": "sdlc-start"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 1
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.body.action === 'assigned' && $json.body.assignee?.login === 'agent-accellier' }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "3d6a4a36-e568-4042-8251-92f4ccc4d2ce",
+        "name": "IF Issue Opened",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          7312,
+          4784
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ (() => { const i = $json.body.issue || {}; const labs = (i.labels || []).map(l => (l.name||'').toLowerCase()); const t = i.title || ''; if (i.type && i.type.name) return i.type.name; if (labs.includes('bug') || /^\\s*\\[bug\\]/i.test(t)) return 'Bug'; if (labs.includes('feature') || /^\\s*\\[feature\\]/i.test(t)) return 'Feature'; return ''; })() }}",
+                      "rightValue": "Bug",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "Bug"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ (() => { const i = $json.body.issue || {}; const labs = (i.labels || []).map(l => (l.name||'').toLowerCase()); const t = i.title || ''; if (i.type && i.type.name) return i.type.name; if (labs.includes('bug') || /^\\s*\\[bug\\]/i.test(t)) return 'Bug'; if (labs.includes('feature') || /^\\s*\\[feature\\]/i.test(t)) return 'Feature'; return ''; })() }}",
+                      "rightValue": "Feature",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "Feature"
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "extra"
+          }
+        },
+        "id": "8bbb0bc8-8498-4177-ab77-c5ffb22fe08b",
+        "name": "Route by Issue Type",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          7536,
+          4784
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Bug Analysis Working"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "9327251a-28f6-4ee5-a277-e281a352b4eb",
+        "name": "Set Milestone Bug Analysis Working",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          7744,
+          4576
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/ba-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "requirement",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+              },
+              {
+                "name": "issue_type",
+                "value": "Bug"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "21666046-0f11-4446-bdee-42d77ca18969",
+        "name": "BA Agent (Bug)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          7904,
+          4576
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "createComment",
+          "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
+          "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
+          "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
+          "body": "=## 🐛 BA Agent — Bug Analysis\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Next step:** Review the analysis below, then comment `approve` to proceed to Dev.\n\n---\n\n{{ $json.brd }}"
+        },
+        "id": "055e272b-d419-4ce0-ae16-44e66541024e",
+        "name": "Comment Bug Analysis",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          8064,
+          4576
+        ],
+        "webhookId": "792b6035-d61b-448a-b552-1b1aa1258e52",
+        "credentials": {
+          "githubApi": {
+            "id": "6eBqkLVAlKwmRlRE",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Bug Analysis Awaiting Approval"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "cd03a613-c070-4cdc-94de-c07784a7a646",
+        "name": "Set Milestone Bug Analysis Awaiting Approval",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8224,
+          4576
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "BRD Working"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "f15e9cef-5abe-419f-8a07-4a19c25a6729",
+        "name": "Set Milestone BRD Working",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          7744,
+          4784
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/ba-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "requirement",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.title + ' ' + ($('GitHub Issue Webhook').item.json.body.issue.body ?? '') }}"
+              },
+              {
+                "name": "issue_type",
+                "value": "Feature"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "b0a01bd5-4c96-40d7-9b38-f23fa549a75b",
+        "name": "BA Agent (Feature)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          7904,
+          4784
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "createComment",
+          "owner": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}",
+          "repository": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}",
+          "issueNumber": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}",
+          "body": "=## 🤖 BA Agent — Business Requirements Document\n\n**Session:** `{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}`\n**Resolution tier:** {{ $json.resolution_tier === 'config' ? '⚙️ Config — no code change needed' : ($json.resolution_tier === 'workaround' ? '🔧 Workaround — use existing features differently' : '💻 Code change required') }}\n**Next step:** Review the BRD below, then comment `approve` to proceed to Solution Architect.\n\n---\n\n{{ $json.brd }}\n\n---\n\n*Needs clarification: {{ $json.needs_clarification }}*"
+        },
+        "id": "7f2f8962-c008-482c-97d8-7a51d287a4fd",
+        "name": "Comment BRD on Issue",
+        "type": "n8n-nodes-base.github",
+        "typeVersion": 1,
+        "position": [
+          8064,
+          4784
+        ],
+        "webhookId": "cebd53a8-5261-4641-80d0-5669528d6176",
+        "credentials": {
+          "githubApi": {
+            "id": "6eBqkLVAlKwmRlRE",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "BRD Awaiting Approval"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "a690a80c-338f-46a8-8324-8496017452c4",
+        "name": "Set Milestone BRD Awaiting Approval",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8224,
+          4784
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const title = $input.item.json.body.issue.title || '';\nconst m = title.match(/^\\[(BA|SA|PM|Dev|Review|QA|Deploy)\\]/);\nconst prefix = m ? m[1] : null;\nreturn [{ json: { ...$input.item.json, task_prefix: prefix } }];"
+        },
+        "id": "cf2bf7f4-5791-49f8-bd99-d70a01c1dd8d",
+        "name": "Detect Task Prefix",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          7744,
+          4976
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Assigned"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "c6dd1428-067c-4acb-bfb2-9de58056efac",
+        "name": "Set Milestone Task Assigned",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          7904,
+          4976
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "BA",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "BA"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "SA",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "SA"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "PM",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "PM"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "Dev",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "Dev"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "Review",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "Review"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "QA",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "QA"
+              },
+              {
+                "conditions": {
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.task_prefix }}",
+                      "rightValue": "Deploy",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and",
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 1
+                  }
+                },
+                "renameOutput": true,
+                "outputKey": "Deploy"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "7f17e05b-f291-4112-98ee-b6a5d4101e97",
+        "name": "Switch Task Prefix",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          8064,
+          4976
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/ba-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"issue_type\": \"Task\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "5c4d8da8-1beb-4107-91e5-227a8e106764",
+        "name": "Task BA Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          4864
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/sa-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "3fc3fe1b-7354-4e27-baab-cda06311edf6",
+        "name": "Task SA Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          4944
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/pm-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "7d279f5f-5a2e-4b93-ba15-3f7b8f4452cd",
+        "name": "Task PM Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          5024
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/dev-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "6ba8ca89-07a9-4593-88db-ad4545416407",
+        "name": "Task Dev Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          5104
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/review-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "3764a424-adb7-4e94-a87f-4f0e53542858",
+        "name": "Task Review Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          5184
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/qa-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "48570200-277e-43a0-9543-47ea741d634e",
+        "name": "Task QA Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          5264
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/deploy-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\", \"env\": \"stage\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "67c1aab2-b626-485f-86a5-c311f96a05a7",
+        "name": "Task Deploy Agent",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8288,
+          5344
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/review-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "f778fc54-1291-4db1-8166-c169d5a1c094",
+        "name": "Task Dev → Review",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          5104
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/qa-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "09f62836-2a8c-4a74-9522-5f6a238c1faf",
+        "name": "Task Dev → QA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8656,
+          5104
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/qa-agent",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={ \"session_id\": \"{{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}-{{ $('GitHub Issue Webhook').item.json.body.repository.name }}-{{ $('GitHub Issue Webhook').item.json.body.issue.number }}\" }",
+          "options": {
+            "timeout": 21600000
+          }
+        },
+        "id": "90cde9e5-833c-42ab-8d27-0505b886f5e2",
+        "name": "Task Review → QA",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          5184
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "5cf0a2ef-84c5-4649-a4a3-61056ab4fdeb",
+        "name": "Set Milestone Task Complete (BA)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          4864
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "8ed25bc8-e908-44b8-9874-b9468c867a54",
+        "name": "Set Milestone Task Complete (SA)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          4944
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "97bd023c-1c03-4d52-95a3-ab488951eead",
+        "name": "Set Milestone Task Complete (PM)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          5024
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "0cd02dc1-15b7-4d8b-a56e-15ce0a7c8985",
+        "name": "Set Milestone Task Complete (Dev)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8832,
+          5104
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "72a59274-b0b2-4b41-b31c-1f974f454e04",
+        "name": "Set Milestone Task Complete (Review)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8656,
+          5184
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "d69736d1-5804-4b2c-8328-f80f2bcd1577",
+        "name": "Set Milestone Task Complete (QA)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          5264
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://10.68.103.135:5001/set-milestone",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "owner",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.owner.login }}"
+              },
+              {
+                "name": "repo",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.repository.name }}"
+              },
+              {
+                "name": "issue_number",
+                "value": "={{ $('GitHub Issue Webhook').item.json.body.issue.number }}"
+              },
+              {
+                "name": "milestone_title",
+                "value": "Task: Complete"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "9a4932db-1a60-445e-9833-a7eb2b4be9a9",
+        "name": "Set Milestone Task Complete (Deploy)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          8464,
+          5344
+        ]
+      },
+      {
+        "id": "0b59786d-9995-4b07-86d9-4ad2447b101c",
+        "name": "Limit? BA Agent (Bug)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8124,
+          4576
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "543922cb-307d-4c41-85e8-927817abb19f",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "8b43125e-f016-465b-a800-3cd54a801f1a",
+        "name": "Wait BA Agent (Bug)",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8124,
+          4756
+        ],
+        "webhookId": "cff2ddf1-d9b1-40a8-8ba5-bff484886d5f",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "d241ba8b-c94d-4a62-b8f0-c0ac52843e09",
+        "name": "Limit? BA Agent (Feature)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8124,
+          4784
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "d0674b79-4c3f-443c-b6e4-08b58216467a",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "17b4cd79-3cf8-4020-9358-bbf9fdddab5f",
+        "name": "Wait BA Agent (Feature)",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8124,
+          4964
+        ],
+        "webhookId": "1a56e4ee-17f7-4a44-9e66-ea222ba03da4",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "b5ccce2a-62ec-41a7-8106-8e6f62e0b521",
+        "name": "Limit? Task BA Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          4864
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "96b2e486-6f3d-44f6-a866-b1141a9eac9d",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "17dd64af-cd3e-485f-bc99-778806a9ff78",
+        "name": "Wait Task BA Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5044
+        ],
+        "webhookId": "d4a33119-0a5a-4970-a2df-e928b9a89299",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "078e2e40-f027-4cf7-9b65-be9bf5beaf02",
+        "name": "Limit? Task SA Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          4944
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "250bbb7e-d478-4591-a5a4-1cecab969a57",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "d2988669-efe0-479e-8a08-d18363e432ee",
+        "name": "Wait Task SA Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5124
+        ],
+        "webhookId": "d2fc7cd2-9723-45d3-b760-98a0fe600097",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "d7cf92f0-73ab-4c8e-afb2-2920f85cdbe5",
+        "name": "Limit? Task PM Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          5024
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "3f846532-c1ee-42e4-aea0-19083faf5989",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "2923fba5-f1e8-49a0-b7a6-fa2588c16825",
+        "name": "Wait Task PM Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5204
+        ],
+        "webhookId": "25b869fe-a5ce-45ba-8f44-1df3b0d56440",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "866d0f8b-0c3d-4e57-910a-c21d3c33a8a5",
+        "name": "Limit? Task Dev Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          5104
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "de39280f-4213-4c75-8e35-f0be72663f76",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "47e7d589-270b-4086-8614-8d0116d8625c",
+        "name": "Wait Task Dev Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5284
+        ],
+        "webhookId": "1039b460-6af3-4f9b-9d0f-eff735a37d5b",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "52a74297-f91f-4c8a-b50b-aaf42e2604b4",
+        "name": "Limit? Task Review Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          5184
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "3e8fd014-d1d2-4d20-81b2-245de208b531",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "c2048655-c1ee-4829-8fbd-3e198d844967",
+        "name": "Wait Task Review Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5364
+        ],
+        "webhookId": "7e641ade-eb30-4070-9204-238d9068a061",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "ac143278-c9d0-4f03-94fd-1020c690ca7d",
+        "name": "Limit? Task QA Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          5264
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "61f01efa-e5e5-4a08-90b6-47197e683691",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "1b2c838b-2864-4c4f-8873-052b77586812",
+        "name": "Wait Task QA Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5444
+        ],
+        "webhookId": "47511261-56b1-48bf-82ec-9694af516141",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "3672b94e-6033-4be2-afa8-937ab82230bd",
+        "name": "Limit? Task Deploy Agent",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8508,
+          5344
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "96374100-08a6-4673-9cfd-301a17c983e9",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "a3c6fc64-3e32-4285-b5b9-e039978c1572",
+        "name": "Wait Task Deploy Agent",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8508,
+          5524
+        ],
+        "webhookId": "ad0e23a6-d92e-45b1-a312-d2412293f351",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "121338c4-497e-446f-80e3-673896c89020",
+        "name": "Limit? Task Dev → Review",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8684,
+          5104
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "4a99e0a1-c074-40c8-b620-0a55ff3db887",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "31d7999a-af5e-453d-93af-60ed29ba0c1b",
+        "name": "Wait Task Dev → Review",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8684,
+          5284
+        ],
+        "webhookId": "b231b85f-3225-43c3-a158-48331156a064",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "2d592b83-d3f0-473b-9ec3-9f38dbc91286",
+        "name": "Limit? Task Dev → QA",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8876,
+          5104
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c53717f3-5e59-4d4c-b70c-daa39a914672",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "b75f5c9a-e56d-4e93-8b08-63d246ece7f3",
+        "name": "Wait Task Dev → QA",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8876,
+          5284
+        ],
+        "webhookId": "2ca24fc3-9d27-4ab8-8bd0-37c21b5b23ea",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      },
+      {
+        "id": "c1907044-ff29-4017-b2e9-5f9e9a341a5c",
+        "name": "Limit? Task Review → QA",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          8684,
+          5184
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "typeValidation": "loose",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "086d174f-da12-4a2d-b642-e0bcc3fc20f1",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "rate_limited",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "1d787ff8-3c81-4b0e-b492-d4639efe9ea7",
+        "name": "Wait Task Review → QA",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          8684,
+          5364
+        ],
+        "webhookId": "34d945f1-f12b-49f8-8792-8818dc4e9085",
+        "parameters": {
+          "amount": "={{ ($json.retry_after_seconds || 300) + 60 }}",
+          "unit": "seconds"
+        }
+      }
+    ],
+    "connections": {
+      "GitHub Issue Webhook": {
+        "main": [
+          [
+            {
+              "node": "IF Issue Opened",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Issue Opened": {
+        "main": [
+          [
+            {
+              "node": "Route by Issue Type",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Issue Type": {
+        "main": [
+          [
+            {
+              "node": "Set Milestone Bug Analysis Working",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone BRD Working",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Detect Task Prefix",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Milestone Bug Analysis Working": {
+        "main": [
+          [
+            {
+              "node": "BA Agent (Bug)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BA Agent (Bug)": {
+        "main": [
+          [
+            {
+              "node": "Limit? BA Agent (Bug)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Comment Bug Analysis": {
+        "main": [
+          [
+            {
+              "node": "Set Milestone Bug Analysis Awaiting Approval",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Milestone BRD Working": {
+        "main": [
+          [
+            {
+              "node": "BA Agent (Feature)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BA Agent (Feature)": {
+        "main": [
+          [
+            {
+              "node": "Limit? BA Agent (Feature)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Comment BRD on Issue": {
+        "main": [
+          [
+            {
+              "node": "Set Milestone BRD Awaiting Approval",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Detect Task Prefix": {
+        "main": [
+          [
+            {
+              "node": "Set Milestone Task Assigned",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Milestone Task Assigned": {
+        "main": [
+          [
+            {
+              "node": "Switch Task Prefix",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch Task Prefix": {
+        "main": [
+          [
+            {
+              "node": "Task BA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task SA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task PM Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Dev Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Review Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task QA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Deploy Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task BA Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task BA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task SA Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task SA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task PM Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task PM Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Dev Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Dev Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Dev → Review": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Dev → Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Dev → QA": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Dev → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Review Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Review Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Review → QA": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Review → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task QA Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task QA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Task Deploy Agent": {
+        "main": [
+          [
+            {
+              "node": "Limit? Task Deploy Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? BA Agent (Bug)": {
+        "main": [
+          [
+            {
+              "node": "Wait BA Agent (Bug)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Comment Bug Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait BA Agent (Bug)": {
+        "main": [
+          [
+            {
+              "node": "BA Agent (Bug)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? BA Agent (Feature)": {
+        "main": [
+          [
+            {
+              "node": "Wait BA Agent (Feature)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Comment BRD on Issue",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait BA Agent (Feature)": {
+        "main": [
+          [
+            {
+              "node": "BA Agent (Feature)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task BA Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task BA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (BA)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task BA Agent": {
+        "main": [
+          [
+            {
+              "node": "Task BA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task SA Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task SA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (SA)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task SA Agent": {
+        "main": [
+          [
+            {
+              "node": "Task SA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task PM Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task PM Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (PM)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task PM Agent": {
+        "main": [
+          [
+            {
+              "node": "Task PM Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Dev Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Dev Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Dev → Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Dev Agent": {
+        "main": [
+          [
+            {
+              "node": "Task Dev Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Review Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Review Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Review → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Review Agent": {
+        "main": [
+          [
+            {
+              "node": "Task Review Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task QA Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task QA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (QA)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task QA Agent": {
+        "main": [
+          [
+            {
+              "node": "Task QA Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Deploy Agent": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Deploy Agent",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (Deploy)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Deploy Agent": {
+        "main": [
+          [
+            {
+              "node": "Task Deploy Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Dev → Review": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Dev → Review",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Task Dev → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Dev → Review": {
+        "main": [
+          [
+            {
+              "node": "Task Dev → Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Dev → QA": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Dev → QA",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (Dev)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Dev → QA": {
+        "main": [
+          [
+            {
+              "node": "Task Dev → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Limit? Task Review → QA": {
+        "main": [
+          [
+            {
+              "node": "Wait Task Review → QA",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Set Milestone Task Complete (Review)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Task Review → QA": {
+        "main": [
+          [
+            {
+              "node": "Task Review → QA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Accellier Support",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-06-12T07:27:45.942Z",
+        "id": 72,
+        "workflowId": "LJPESeFKy5wd8SL8",
+        "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+        "event": "activated",
+        "userId": "d611e843-bf77-4165-b4ec-70b055c28585"
+      },
+      {
+        "createdAt": "2026-06-12T07:27:47.689Z",
+        "id": 74,
+        "workflowId": "LJPESeFKy5wd8SL8",
+        "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+        "event": "activated",
+        "userId": "d611e843-bf77-4165-b4ec-70b055c28585"
+      },
+      {
+        "createdAt": "2026-06-12T07:27:45.919Z",
+        "id": 71,
+        "workflowId": "LJPESeFKy5wd8SL8",
+        "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+        "event": "deactivated",
+        "userId": "d611e843-bf77-4165-b4ec-70b055c28585"
+      },
+      {
+        "createdAt": "2026-06-12T07:27:47.663Z",
+        "id": 73,
+        "workflowId": "LJPESeFKy5wd8SL8",
+        "versionId": "5019ad40-c2d8-4ad3-be08-eb0c9125038c",
+        "event": "deactivated",
+        "userId": "d611e843-bf77-4165-b4ec-70b055c28585"
+      }
+    ]
+  }
+}
