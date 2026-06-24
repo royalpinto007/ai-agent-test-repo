@@ -210,6 +210,29 @@ def _repo_target(slug, cfg):
     }
 
 
+def _detect_new_module(requirement):
+    """Detect an explicit 'new module' request and return a to-be-created
+    target_repo (create=True) for it; else None.
+
+    Deliberately requires an EXPLICIT, named signal so we never auto-create a repo
+    from vague prose. Recognised forms (case-insensitive), the captured group is
+    the module name:
+      - 'New module: <Name>'  /  'New module - <Name>'
+      - 'create a new [custom] module named|called <Name>'
+    """
+    import re
+    req = requirement or ""
+    # module names are single tokens (e.g. CamelCase) — capture one token, no spaces
+    m = re.search(r'(?:^|\n)\s*new module\s*[:\-]\s*["`]?([A-Za-z][A-Za-z0-9_-]{1,40})', req, re.IGNORECASE)
+    if not m:
+        m = re.search(r'\bnew\s+(?:custom\s+)?module\s+(?:named|called)\s+["`]?([A-Za-z][A-Za-z0-9_-]{1,40})',
+                      req, re.IGNORECASE)
+    if not m:
+        return None
+    from shared.provision import module_target
+    return module_target(m.group(1).strip())
+
+
 def _detect_component(requirement):
     """Resolve which registered code repo a requirement targets, so Dev/Review run
     against — and open the PR in — that repo. Returns a target_repo dict or None
@@ -345,9 +368,10 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     resolution_tier = _parse_resolution_tier(brd)
     config_only = resolution_tier in ("config", "workaround")
 
-    # If the requester named a target component on the issue form, route the
-    # downstream code stages (and the PR) to that repo. None => PM decides.
-    target_repo = _detect_component(requirement)
+    # Route the downstream code stages (and the PR) to a repo:
+    #  - an explicit "new module" request → a to-be-created repo (Dev provisions it), else
+    #  - a code repo named/slugged in the issue, else None => PM decides.
+    target_repo = _detect_new_module(requirement) or _detect_component(requirement)
 
     session_update = {
         "requirement": requirement,

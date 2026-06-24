@@ -133,6 +133,19 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     else:
         repo_path = repo_path or session.get("repo_path")
 
+    # New-module request (BA flagged target_repo with create=True): stand the repo
+    # up — create it on GitHub, clone it, bind-mount into the live htdocs/custom,
+    # and register it in repos.json — before anything touches repo_path.
+    if isinstance(target_repo, dict) and target_repo.get("create"):
+        import os as _osp
+        from shared.provision import provision_module
+        target_repo = provision_module(target_repo, _osp.environ.get("GITHUB_TOKEN", ""))
+        repo_path = target_repo.get("repo_path") or repo_path
+        test_command = test_command or target_repo.get("test_command")
+        main_branch = target_repo.get("main_branch", main_branch)
+        session["target_repo"] = target_repo
+        save_session(session_id, {"target_repo": target_repo, "repo_path": repo_path})
+
     # ── Dependency check ─────────────────────────────────────────────────────
     # If the PM created sub-issues and the current task declares dependencies,
     # block until those issues are closed on GitHub.
