@@ -92,7 +92,7 @@ case "$cmd" in
     ROOT="$(resolve_root "${1:-}")"
     echo "## Custom modules under $ROOT/custom:"
     if [ -d "$ROOT/custom" ]; then
-      find "$ROOT/custom" -maxdepth 3 -path '*/core/modules/mod*.class.php' 2>/dev/null | sort | while read -r f; do
+      find "$ROOT/custom" -maxdepth 5 -path '*/core/modules/mod*.class.php' 2>/dev/null | sort | while read -r f; do
         rel="${f#$ROOT/}"; echo "  $rel"
       done
     else
