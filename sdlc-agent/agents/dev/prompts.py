@@ -124,6 +124,7 @@ TASK: {issue_title}
 
 Rules for this automated run:
 - Implement the smallest correct change that satisfies the task. Match existing Dolibarr conventions exactly (mirror real code; reuse before rewriting).
+- **Scaffolding — prefer the Module Builder MCP.** When the task is to CREATE A NEW MODULE or add a standard object/table/field/page to one, you MUST use the `dolibarr_expert` MCP `amb_*` tools (`amb_init_module`, `amb_add_object`, `amb_add_field`, `amb_add_extrafields`, …) to scaffold, rather than hand-writing those files. They are available and working. Only hand-write as a fallback if a specific `amb_*` call genuinely fails (e.g. HTTP 501/permission) — and when you do, say so explicitly in the Summary. For small edits to existing code (a lang key, a tweak in an existing method), just edit the file directly; `amb_*` is for scaffolding.
 - Edit files **in place** in the working directory with your file tools. Do NOT run `git add`, `git commit`, `git push`, `git checkout`, or create branches — the pipeline commits, pushes, and opens the PR from your working-tree changes.
 - Verify behaviour the skill's way where you can (drive the flow / read the log / check the DB), but do not start long-running servers or background processes.
 - If a schema/descriptor change needs a module reactivation to take effect, note it in the PR description rather than reactivating in this run.
