@@ -544,9 +544,15 @@ def _is_agentic(target_repo):
 
 def _changed_paths(repo_path):
     """Files modified/added in the working tree (the agent's edits), from
-    `git status --porcelain`. Handles renames (takes the new path)."""
-    r = subprocess.run(["git", "status", "--porcelain"], cwd=repo_path,
-                       capture_output=True, text=True)
+    `git status --porcelain`. Handles renames (takes the new path).
+
+    Uses --untracked-files=all so a brand-new untracked DIRECTORY (e.g. the
+    skill's .dolibarr-dev/) is expanded to its individual files instead of being
+    reported as a directory entry; we also defensively skip any dir path so a
+    later read_file() can't choke with 'Is a directory'."""
+    import os as _os
+    r = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"],
+                       cwd=repo_path, capture_output=True, text=True)
     paths = []
     for line in r.stdout.splitlines():
         if not line.strip():
@@ -554,7 +560,9 @@ def _changed_paths(repo_path):
         p = line[3:]
         if " -> " in p:
             p = p.split(" -> ", 1)[1]
-        paths.append(p.strip().strip('"'))
+        p = p.strip().strip('"')
+        if p and not _os.path.isdir(_os.path.join(repo_path, p)):
+            paths.append(p)
     return sorted(set(paths))
 
 
