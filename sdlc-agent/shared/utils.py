@@ -21,6 +21,34 @@ def run_tests(cwd, command=None):
     return passed, output
 
 
+def search_github_issues(repo, terms, token, limit=5):
+    """Search a GitHub repo's issues for `terms` (to surface a possibly-known
+    upstream bug). Returns [{number,title,url,state}] (best-effort, [] on error)."""
+    import urllib.parse, urllib.request, json
+    terms = (terms or "").strip()
+    if not token or not terms:
+        return []
+    q = f"repo:{repo} is:issue {terms}"
+    url = "https://api.github.com/search/issues?per_page=" + str(int(limit)) + "&q=" + urllib.parse.quote(q)
+    req = urllib.request.Request(url)
+    req.add_header("Authorization", f"token {token}")
+    req.add_header("Accept", "application/vnd.github+json")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            data = json.loads(r.read() or b"{}")
+    except Exception:
+        return []
+    out = []
+    for it in (data.get("items") or [])[:limit]:
+        out.append({
+            "number": it.get("number"),
+            "title": (it.get("title") or "")[:140],
+            "url": it.get("html_url", ""),
+            "state": it.get("state", ""),
+        })
+    return out
+
+
 _IGNORE_DIRS = {
     ".git", "node_modules", "venv", ".venv", "__pycache__", ".env",
     "sessions", "dist", "build", ".next", ".nuxt", "coverage",

@@ -369,7 +369,19 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     if issue_type == "Bug":
         file_contents = _load_relevant_files(requirement, file_tree_str, file_lookup)
         issue_title = requirement.split("\n")[0].strip()
-        brd = ask_claude(bug_analysis_prompt(issue_title, requirement, file_contents, file_tree_str))
+        # Check the upstream Dolibarr repo for a possibly-known bug, so the report
+        # can cite it instead of (or alongside) analysing from scratch.
+        upstream_issues = []
+        try:
+            import os as _osu, re as _reu
+            from shared.utils import search_github_issues
+            _terms = " ".join(dict.fromkeys(_reu.findall(r'[A-Za-z]{4,}', issue_title)))[:120]
+            upstream_issues = search_github_issues(
+                _osu.environ.get("UPSTREAM_DOLIBARR_REPO", "Dolibarr/dolibarr"),
+                _terms, _osu.environ.get("GITHUB_TOKEN", ""), 6)
+        except Exception:
+            upstream_issues = []
+        brd = ask_claude(bug_analysis_prompt(issue_title, requirement, file_contents, file_tree_str, upstream_issues=upstream_issues))
         system_analysis = ""
 
         bug_session = {

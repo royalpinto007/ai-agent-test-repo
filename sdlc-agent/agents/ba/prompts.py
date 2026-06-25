@@ -8,11 +8,21 @@ _STACK_DETECTION_RULES = """STACK DETECTION RULES (read carefully):
 """
 
 
-def bug_analysis_prompt(issue_title, issue_description, file_contents, file_tree_str):
+def bug_analysis_prompt(issue_title, issue_description, file_contents, file_tree_str, upstream_issues=None):
     files_section = "\n\n".join(
         f"FILE: {path}\n```\n{content}\n```"
         for path, content in file_contents.items()
     )
+    upstream_section = ""
+    if upstream_issues:
+        lines = "\n".join(
+            f"- #{u['number']} [{u.get('state','')}] {u['title']} — {u['url']}"
+            for u in upstream_issues
+        )
+        upstream_section = (
+            "\nPOSSIBLY-RELATED UPSTREAM DOLIBARR ISSUES (from a search of the "
+            "Dolibarr/dolibarr GitHub — may or may not be the same bug):\n" + lines + "\n"
+        )
     return f"""You're a senior engineer performing a bug analysis. Output ONLY the structured report below — no prose, no padding.
 
 {_STACK_DETECTION_RULES}
@@ -27,7 +37,7 @@ FILE TREE:
 
 RELEVANT FILES:
 {files_section}
-
+{upstream_section}
 ---
 
 ## Issue Clarification
@@ -49,6 +59,9 @@ RELEVANT FILES:
 **Option A:** [one line]
 **Option B:** [one line]
 Recommendation: Option [A/B] — [one line reason]
+
+## Upstream Status
+[If a listed upstream Dolibarr issue is genuinely the same bug, cite it: "Known upstream bug — Dolibarr/dolibarr#<num> (<state>): <url>" and say whether a fix/PR exists there. If none of the listed issues match (or none were provided), write "No matching upstream Dolibarr issue found." Do NOT invent issue numbers — only cite ones from the list above.]
 """
 
 

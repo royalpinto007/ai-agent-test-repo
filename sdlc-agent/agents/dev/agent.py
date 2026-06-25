@@ -566,6 +566,36 @@ def _changed_paths(repo_path):
     return sorted(set(paths))
 
 
+def _module_quality_problems(repo_path, changed):
+    """Deterministic post-scaffold checks for a Dolibarr module build, folded into
+    lint problems so a build that ships them is flagged for redo:
+      1. a placeholder README left unfilled (MYMODULE / 'Description of the module...'),
+      2. a numbering model present while the descriptor has module_parts['models'] => 0
+         (refs would never get numbered — stay (PROV...))."""
+    import os as _os, re as _re, glob as _glob
+    probs = []
+    readmes = [p for p in changed if _os.path.basename(p).lower() == "readme.md" and "img/" not in p]
+    if not readmes and _os.path.isfile(_os.path.join(repo_path, "README.md")):
+        readmes = ["README.md"]
+    for p in readmes:
+        try:
+            t = open(_os.path.join(repo_path, p), errors="ignore").read()
+        except Exception:
+            continue
+        if "MYMODULE" in t or "Description of the module..." in t:
+            probs.append((p, "placeholder README left unfilled (MYMODULE / 'Description of the module...') — write a real description"))
+    if _glob.glob(_os.path.join(repo_path, "core/modules/*/mod_*_standard.php")):
+        for desc in _glob.glob(_os.path.join(repo_path, "core/modules/mod*.class.php")):
+            try:
+                d = open(desc, errors="ignore").read()
+            except Exception:
+                continue
+            if _re.search(r"module_parts.*?['\"]models['\"]\s*=>\s*0", d, _re.S):
+                probs.append((_os.path.relpath(desc, repo_path),
+                              "numbering model exists but module_parts['models'] => 0 — set it to 1 or refs stay (PROV...)"))
+    return probs
+
+
 def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_name,
                  main_branch, test_command, pm_tasks, redo_instructions, target_repo):
     """Tool-enabled implementation: Claude works directly in a checked-out branch
@@ -601,6 +631,7 @@ def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_n
                                capture_output=True, text=True)
             return r.stdout if r.returncode == 0 else None
         problems = lint.lint_changed(_orig, applied_content) if applied_content else []
+        problems += _module_quality_problems(repo_path, changed_now)
         passed, out = run_tests(repo_path, test_command)
         return problems, passed, out
 
