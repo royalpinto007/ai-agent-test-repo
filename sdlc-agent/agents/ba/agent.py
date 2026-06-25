@@ -347,6 +347,17 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
 
     ui_needed = _detect_ui_needed(requirement)
 
+    # Resolve which code repo this issue concerns BEFORE analysing, so BA reads the
+    # real source (not the requirements repo). Order: explicit new-module signal ->
+    # repo slug named in the text -> model picks the best match from the catalog.
+    # For an existing repo, analyse against it; a to-be-created module (create=True)
+    # has no code yet, so BA analyses from the requirement text and Dev provisions it.
+    import os as _os
+    target_repo = _detect_new_module(requirement) or _detect_component(requirement) or _select_repo(requirement)
+    if (target_repo and not target_repo.get("create")
+            and target_repo.get("repo_path") and _os.path.isdir(target_repo["repo_path"])):
+        repo_path = target_repo["repo_path"]
+
     # Pull latest before analysing so we read current code.
     try:
         run_git(["pull"], cwd=repo_path)
@@ -361,7 +372,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
         brd = ask_claude(bug_analysis_prompt(issue_title, requirement, file_contents, file_tree_str))
         system_analysis = ""
 
-        save_session(session_id, {
+        bug_session = {
             "requirement": requirement,
             "issue_title": issue_title,
             "repo_path": repo_path,
@@ -372,7 +383,10 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
             "resolution_tier": "code_change",
             "config_only": False,
             "stage": "ba",
-        })
+        }
+        if target_repo:
+            bug_session["target_repo"] = target_repo
+        save_session(session_id, bug_session)
 
         return {
             "system_analysis": system_analysis,
@@ -432,11 +446,8 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     resolution_tier = _parse_resolution_tier(brd)
     config_only = resolution_tier in ("config", "workaround")
 
-    # Route the downstream code stages (and the PR) to a repo:
-    #  - an explicit "new module" request → a to-be-created repo (Dev provisions it), else
-    #  - a code repo named/slugged in the issue, else None => PM decides.
-    target_repo = _detect_new_module(requirement) or _detect_component(requirement) or _select_repo(requirement)
-
+    # target_repo was resolved at the top (used to pick the source BA analysed and
+    # to route downstream Dev/Review + the PR).
     session_update = {
         "requirement": requirement,
         "issue_title": requirement.split("\n")[0].strip(),
