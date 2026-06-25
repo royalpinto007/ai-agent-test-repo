@@ -593,6 +593,22 @@ def _module_quality_problems(repo_path, changed):
             if _re.search(r"module_parts.*?['\"]models['\"]\s*=>\s*0", d, _re.S):
                 probs.append((_os.path.relpath(desc, repo_path),
                               "numbering model exists but module_parts['models'] => 0 — set it to 1 or refs stay (PROV...)"))
+    # 3. a DROP in a SQL file that _load_tables() auto-runs on ENABLE. _load_tables
+    #    loads sql/ files whose name starts with llx_/data/update/functions; an
+    #    "uninstall" DROP named like that (e.g. llx_<mod>.uninstall.sql) runs on
+    #    install and drops the just-created table. Uninstall SQL must be named
+    #    plain uninstall.sql (which _load_tables skips).
+    for sf in _glob.glob(_os.path.join(repo_path, "sql/*.sql")):
+        base = _os.path.basename(sf).lower()
+        if not base.startswith(("llx_", "data", "update", "functions")):
+            continue
+        try:
+            c = open(sf, errors="ignore").read()
+        except Exception:
+            continue
+        if _re.search(r"\bDROP\s+TABLE\b", c, _re.I):
+            probs.append((_os.path.relpath(sf, repo_path),
+                          "this SQL is auto-run by _load_tables() on ENABLE (name matches the load prefix) but contains DROP TABLE — rename uninstall SQL to plain uninstall.sql so it isn't run on install"))
     return probs
 
 
