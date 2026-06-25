@@ -273,6 +273,70 @@ def _detect_component(requirement):
     return None
 
 
+def _repo_blurb(cfg):
+    """A one-line description of a code repo, from its README heading or module
+    descriptor, to help the model pick the right repo. Best-effort, cheap."""
+    import os, glob, re
+    p = cfg.get("repo_path", "")
+    if not p:
+        return ""
+    rp = os.path.join(p, "README.md")
+    if os.path.isfile(rp):
+        try:
+            with open(rp, errors="ignore") as f:
+                for line in f:
+                    s = line.strip().lstrip("#").strip()
+                    if len(s) >= 12 and "license" not in s.lower():
+                        return s[:160]
+        except Exception:
+            pass
+    for desc in glob.glob(os.path.join(p, "core/modules/mod*.class.php")):
+        try:
+            with open(desc, errors="ignore") as f:
+                m = re.search(r"this->description\s*=\s*['\"]([^'\"]{6,})", f.read())
+                if m:
+                    return m.group(1)[:160]
+        except Exception:
+            pass
+    return ""
+
+
+def _select_repo(requirement):
+    """When no repo is explicitly named, let the model pick the single most
+    relevant code repo from the (small) registered catalog. Returns a target_repo
+    or None. This is what lets a bug like 'SO billed but shipment not billed' route
+    to the right repo (e.g. core dolibarr) without a manual hint."""
+    repos = get_code_repos()
+    if not repos:
+        return None
+    listing = "\n".join(f"- {slug}: {(_repo_blurb(cfg) or '(no description)')}" for slug, cfg in repos.items())
+    prompt = f"""You are routing a software issue to the ONE code repository whose source must be inspected to address it.
+
+ISSUE:
+{(requirement or '')[:2500]}
+
+AVAILABLE REPOSITORIES (slug: what it is):
+{listing}
+
+Rules:
+- Pick exactly ONE repository slug from the list above — the one whose code most likely contains the behaviour to fix.
+- Core ERP behaviour (sales orders, shipments/expeditions, invoices, payments, stock, products, users) lives in the core Dolibarr repository unless a custom module clearly owns it.
+- Answer with ONLY the slug on a single line, or the word NONE if it is genuinely impossible to tell."""
+    try:
+        ans = ask_claude(prompt).strip()
+    except Exception:
+        return None
+    low = ans.lower()
+    # exact slug or short-name match
+    best = None
+    for slug, cfg in repos.items():
+        short = slug.split("/")[-1].lower()
+        if slug.lower() in low or low == short or (short and short in low):
+            if best is None or len(short) > len(best[0].split("/")[-1]):
+                best = (slug, cfg)
+    return _repo_target(*best) if best else None
+
+
 def run(session_id, requirement, repo_path, clarification_answers=None, human_feedback=None, issue_type=None):
     session = load_session(session_id) or {}
     requirement = requirement or session.get("requirement", "")
@@ -371,7 +435,7 @@ def run(session_id, requirement, repo_path, clarification_answers=None, human_fe
     # Route the downstream code stages (and the PR) to a repo:
     #  - an explicit "new module" request → a to-be-created repo (Dev provisions it), else
     #  - a code repo named/slugged in the issue, else None => PM decides.
-    target_repo = _detect_new_module(requirement) or _detect_component(requirement)
+    target_repo = _detect_new_module(requirement) or _detect_component(requirement) or _select_repo(requirement)
 
     session_update = {
         "requirement": requirement,
