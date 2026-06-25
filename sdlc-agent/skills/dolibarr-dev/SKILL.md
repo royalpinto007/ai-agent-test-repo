@@ -68,7 +68,7 @@ This skill reads a lot (LEARNINGS, scans, schema, large class files). Keep the c
 
 ## Step 0 — Understand before you build (ALWAYS)
 
-0. Read accumulated lessons first: `cat ${CLAUDE_SKILL_DIR}/LEARNINGS.md`. Apply them.
+0. Read accumulated lessons first: `cat ${CLAUDE_SKILL_DIR}/LEARNINGS.md ${CLAUDE_SKILL_DIR}/LEARNINGS.local.md 2>/dev/null`. Apply them. (`LEARNINGS.md` = committed/curated; `LEARNINGS.local.md` = this box's runtime append — untracked, so it never blocks a `git pull` deploy.)
 0.5 **Read the module's brain** — `bash ${CLAUDE_SKILL_DIR}/scripts/brain.sh show <module>`.
    If it exists, it tells you WHAT was demanded before, WHY it was built that way,
    which scenarios were considered, and what's still open — so you don't re-derive
@@ -547,12 +547,14 @@ session is better off than you were.
 ## Keep this skill improving (self-build)
 
 This skill is meant to get better with use:
-- At the START you already read `LEARNINGS.md` (Step 0). Apply those lessons.
+- At the START you already read `LEARNINGS.md` (+ `LEARNINGS.local.md`) at Step 0. Apply those lessons.
 - At the END, if you learned something reusable — a Dolibarr convention, a
   non-obvious API, a pitfall, a corrected assumption, a confirmed trigger/hook
-  name/API endpoint — append ONE concise dated bullet:
+  name/API endpoint — append ONE concise dated bullet to the **local** file
+  (NOT the committed `LEARNINGS.md` — writing the tracked file breaks `git pull`
+  deploys):
   ```bash
-  printf -- '- %s — %s\n' "$(date +%F)" "your one-line lesson" >> ${CLAUDE_SKILL_DIR}/LEARNINGS.md
+  printf -- '- %s — %s\n' "$(date +%F)" "your one-line lesson" >> ${CLAUDE_SKILL_DIR}/LEARNINGS.local.md
   ```
   Only record VERIFIED, reusable facts; dedupe first; keep it to one or two lines.
   If a lesson contradicts an instruction in THIS file, fix the SKILL.md body directly.
