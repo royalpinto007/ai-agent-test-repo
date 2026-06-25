@@ -89,9 +89,21 @@ def _build_repo_context(session_id, repo_path, requirement=""):
                     lookup[seen] = (rp, f)
     else:
         if repo_path and os.path.isdir(repo_path):
-            for f in get_file_tree(repo_path):
-                tree_lines.append(f)
-                lookup[f] = (repo_path, f)
+            files = get_file_tree(repo_path)
+            if len(files) <= _BIG_REPO_FILES:
+                for f in files:
+                    tree_lines.append(f)
+                    lookup[f] = (repo_path, f)
+            else:
+                # Large repo (e.g. core Dolibarr ~21k files): don't dump the whole
+                # tree (the prompt would overflow) — surface only keyword matches.
+                matched = grep_repo_fast(repo_path, keywords, max_results=_BIG_REPO_MATCHES) if keywords else []
+                tree_lines.append(
+                    f"# large repo ({len(files)} files) — showing only files matching "
+                    f"the issue keywords; grep for more if needed")
+                for f in matched:
+                    tree_lines.append(f)
+                    lookup[f] = (repo_path, f)
 
     return "\n".join(tree_lines) if tree_lines else "(no code visible)", lookup
 
