@@ -18,23 +18,26 @@ files live under `htdocs/custom/<module-lowercased>`. There is no `read_file`
 tool — inspect or verify any file by reading it straight off disk with
 `Read`/`Grep` under `htdocs/custom/<module>/` (or core under `htdocs/`).
 
-## Two ways to build — pick the lighter one that fits
+## Two ways to build — scaffold via the Module Builder, hand-write the rest
 
-1. **Hand-write PHP/SQL that mirrors core** — the default for almost all real
-   work: descriptor edits, object classes, hand-written `sql/llx_*.sql`, hook
-   handlers, triggers, admin pages, lib helpers, API integrations. You have
-   `Read`/`Edit`/`Write` and `Bash`; use them on the files directly. This is how
-   the modules in `htdocs/custom/` are actually built.
-2. **`amb_*` Module Builder MCP tools** (server `dolibarr_expert`) — an *optional
-   scaffolder*. Best for generating a brand-new module skeleton or a standard
-   object's boilerplate (class + SQL + card/list/menus). Each call edits the
-   generated files on disk **directly** — no manifest, no regenerate/validate
-   step. The structured tools (`amb_add_field` etc.) are convenient for the
-   standard object pattern, but you are **not** required to route changes through
-   them — editing the PHP/SQL by hand is equally valid and often clearer.
-
-   ⚠️ `amb_*` can return **HTTP 501** (endpoint unavailable). Fallback: hand-scaffold
-   by mirroring an existing custom module — the output is identical standard files.
+1. **`amb_*` Module Builder MCP tools** (server `dolibarr_expert`) — the PREFERRED
+   way to SCAFFOLD a new module or a standard object/field/page. Use
+   `amb_init_module`, `amb_add_object`, `amb_add_field`, `amb_add_extrafields`,
+   etc.: they generate the descriptor, object class, `sql/llx_*.sql`, card/list,
+   menus and numbering wiring as proper standard files, edited on disk directly
+   (no manifest/regenerate step). When the task is "create a module" or "add an
+   object/field/table to a module", **drive it through `amb_*`** — do NOT hand-write
+   the skeleton. This is what routes module builds through the MCP.
+   ⚠️ Only if an `amb_*` call genuinely fails (e.g. HTTP 501 endpoint unavailable,
+   or a permission error like `modulebuilder->run`) do you fall back to
+   hand-scaffolding by mirroring an existing custom module — and **say so explicitly**
+   in your report (which tool failed and why). The hand-scaffold output is the same
+   standard files.
+2. **Hand-write PHP/SQL that mirrors core** — for everything that is NOT standard
+   scaffolding: edits to existing files, hook handlers, triggers, business logic,
+   admin/setup pages, lib helpers, API integrations, and any non-standard code.
+   You have `Read`/`Edit`/`Write` and `Bash`; use them directly, mirroring a
+   concrete working example. (Also the documented fallback when `amb_*` is down.)
 
 Bundled helpers (call via `${CLAUDE_SKILL_DIR}/scripts/...`):
 - `scan-code.sh` — extract hook contexts, hook method points, trigger action
