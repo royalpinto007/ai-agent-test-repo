@@ -74,6 +74,14 @@ Example intended flow:
 
 The historical issue is that many credit notes were created and validated, but not converted/applied as Dolibarr credits before payment. In some cases, the invoice was paid as if the credit did not exist.
 
+## How To Read The Examples
+
+Each repair example uses simple numbers. The important idea is always the same:
+
+- A credit note means eBay/customer should owe us less.
+- If the full invoice was already paid before the credit was applied, the payment needs to be corrected down to the net amount.
+- If the credit is larger than the invoice or no invoice can be found, the remaining value should stay as available credit instead of forcing a negative balance.
+
 ## Repair Actions
 
 ### 1. `REPAIR_SINGLE_CN_SINGLE_PAYMENT`
@@ -83,14 +91,14 @@ Credit amount: `$14,117.21`
 
 Meaning:
 
-A single module-created credit note is linked to one source invoice, and that invoice has one payment line. This is the cleanest case.
+A single module-created credit note belongs to one invoice, and that invoice has one payment. This is the simplest and most common repair.
 
 Repair:
 
-1. Reduce or reverse the existing payment allocation by the credit note amount.
+1. Correct the payment so it is reduced by the credit note amount.
 2. Mark the credit note as available.
-3. Apply the credit note to the source invoice.
-4. Recreate or adjust the payment for the net amount.
+3. Apply the credit note to the invoice.
+4. Leave the invoice paid for the correct net amount.
 
 Example:
 
@@ -101,9 +109,10 @@ Example:
 
 After repair:
 
-- Credit note `$150` is applied to invoice.
-- Payment against invoice becomes `$850`.
-- Invoice remains paid, but no overpayment remains.
+- The invoice is still paid.
+- The credit note reduces the invoice by `$150`.
+- The payment is corrected from `$1,000` to `$850`.
+- Customer outstanding is not overstated or negative.
 
 ### 2. `REPAIR_USING_EXISTING_CN_SOURCE_INVOICE_IGNORE_ORDER_AMBIGUITY`
 
@@ -112,23 +121,24 @@ Credit amount: `$18,405.22`
 
 Meaning:
 
-The eBay order has multiple invoices, but the credit note already has a direct `fk_facture_source` link to the intended source invoice.
+The eBay order has more than one invoice, but the credit note already points to the exact invoice it was created from. We do not need to guess.
 
 Repair:
 
-Use the source invoice link on the credit note instead of guessing from the order number.
+Use the invoice already linked on the credit note, apply the credit there, and adjust that invoice payment only.
 
 Example:
 
-- eBay order has invoices `IN100` and `IN101`.
-- Credit note `IC200` is explicitly linked to `IN101`.
-- Even though the order has multiple invoices, repair uses `IN101`.
+- eBay order `01-12345-67890` has two invoices: `IN100` for `$600` and `IN101` for `$400`.
+- Credit note `IC200` for `$80` is already linked to `IN101`.
+- Payment on `IN101` was recorded as `$400`.
+- Correct payment on `IN101` should be `$320`.
 
 After repair:
 
-- Apply `IC200` to `IN101`.
-- Adjust payment on `IN101` only.
-- Leave `IN100` untouched.
+- `IC200` is applied to `IN101`.
+- Payment on `IN101` is corrected from `$400` to `$320`.
+- `IN100` is not touched.
 
 ### 3. `APPLY_CN_WITH_RESIDUAL_AVAILABLE_CREDIT`
 
@@ -137,13 +147,13 @@ Credit amount: `$17,774.20`
 
 Meaning:
 
-The credit note amount is larger than the amount paid or larger than the remaining invoice balance.
+The credit note is larger than what can be applied to the invoice. We should apply what fits and keep the extra as available credit.
 
 Repair:
 
 1. Apply as much credit as can be applied to the source invoice.
-2. Leave the remaining credit as available customer credit.
-3. Do not force the invoice/customer into a negative balance.
+2. Keep the remaining credit available on the customer account.
+3. Do not force the invoice or customer balance below zero.
 
 Example:
 
@@ -153,8 +163,9 @@ Example:
 
 After repair:
 
-- `$100` credit can offset the invoice.
-- `$30` remains as available credit for accounting/customer review.
+- `$100` of the credit is used against the invoice.
+- `$30` remains available as customer credit.
+- The invoice is not pushed to `-$30`.
 
 ### 4. `MARK_CN_AVAILABLE_STANDALONE_NO_SOURCE_INVOICE`
 
@@ -163,7 +174,7 @@ Credit amount: `$9,217.67`
 
 Meaning:
 
-The module-created credit note has no usable source invoice link, and no matching invoice was found for that order.
+The module created a credit note, but we cannot find a source invoice to apply it to. Since the credit note is ours, it should still become available credit instead of sitting unused.
 
 Repair:
 
@@ -173,11 +184,13 @@ Example:
 
 - Credit note `IC200`: `$75`
 - No source invoice found.
+- There is no safe invoice target.
 
 After repair:
 
 - `IC200` becomes available credit on the eBay customer account.
-- Accounting can later apply or clear it as needed.
+- Accounting can later apply, clear, or review it.
+- No payment is changed automatically.
 
 ### 5. `REPAIR_GROUPED_CNS_FOR_ONE_INVOICE`
 
@@ -186,11 +199,11 @@ Credit amount: `$5,352.46`
 
 Meaning:
 
-There are multiple module-created credit notes for the same source invoice, but the invoice has one payment and that payment covers the total credit amount.
+Several module-created credit notes belong to the same invoice. They should be repaired together so the invoice/payment math stays consistent.
 
 Repair:
 
-Process all credit notes for that invoice together.
+Add the credit notes together, apply them all to the invoice, and correct the payment by the combined credit amount.
 
 Example:
 
@@ -198,11 +211,13 @@ Example:
 - Credit notes: `IC201 = $50`, `IC202 = $75`
 - Payment currently recorded: `$1,000`
 - Total credits: `$125`
+- Correct payment should be `$875`.
 
 After repair:
 
 - Apply both credit notes to `IN100`.
-- Correct payment becomes `$875`.
+- Payment is corrected from `$1,000` to `$875`.
+- Invoice remains paid correctly.
 
 ### 6. `RELINK_CN_TO_ONLY_ORDER_INVOICE_THEN_REPAIR`
 
@@ -211,7 +226,7 @@ Credit amount: `$882.62`
 
 Meaning:
 
-The credit note is missing a source invoice link, but the eBay order has exactly one invoice. That invoice can be treated as the intended source.
+The credit note does not directly point to an invoice, but the eBay order has exactly one invoice. Since there is only one possible target, we can use that invoice.
 
 Repair:
 
@@ -224,12 +239,15 @@ Example:
 
 - eBay order `01-12345-67890`
 - One invoice found: `IN100`
-- Credit note `IC200` has no source link.
+- Credit note `IC200`: `$40`
+- Payment currently recorded on `IN100`: `$500`
+- Correct payment should be `$460`.
 
 After repair:
 
 - Treat `IN100` as the source invoice.
 - Apply `IC200` to `IN100`.
+- Correct the invoice payment to the net amount.
 
 ### 7. `MARK_APPLY_CN_NO_PAYMENT_REVERSAL`
 
@@ -238,11 +256,11 @@ Credit amount: `$771.09`
 
 Meaning:
 
-The credit note has a source invoice, but there is no payment line to reverse.
+The credit note has a source invoice, but no payment has been recorded yet. That means there is no payment to correct.
 
 Repair:
 
-Mark the credit note available and apply it to the source invoice. No payment change is needed.
+Mark the credit note available and apply it to the source invoice. Leave payments alone.
 
 Example:
 
@@ -254,6 +272,7 @@ After repair:
 
 - Apply `$50` credit to invoice.
 - Invoice open balance becomes `$450`.
+- No payment record is changed.
 
 ### 8. `GROUPED_CN_REVIEW_PAYMENT_SHORT_OR_COMPLEX`
 
@@ -262,11 +281,11 @@ Credit amount: `$1,810.28`
 
 Meaning:
 
-There are multiple credit notes for one invoice, but the payment does not cleanly cover all credit notes or payment data is not simple.
+There are multiple credit notes for the invoice, but the payment does not cleanly cover the full credit amount. This is still our module-created data, but it needs a rule before applying.
 
 Repair:
 
-Needs a scripted rule or accounting decision before applying.
+Use a scripted rule or accounting decision to decide how much credit can be applied and how much should remain available.
 
 Example:
 
@@ -274,9 +293,16 @@ Example:
 - Credit notes total: `$400`
 - Payment recorded: `$250`
 
-Question to resolve:
+Why this needs a decision:
 
-Should `$300` be applied against the invoice and `$100` remain available, or is one of the credit notes duplicate/incorrect?
+- The credit is larger than the invoice/payment situation.
+- We can apply up to the invoice amount, but there may be leftover credit.
+- We need to decide whether the extra `$100` is valid available credit or whether one credit note is duplicate.
+
+Possible after repair:
+
+- `$300` credit is applied to close the invoice.
+- `$100` stays as available credit, if accounting confirms it is valid.
 
 ### 9. `REVIEW_AMBIGUOUS_ORDER_AND_COMPLEX_PAYMENT`
 
@@ -285,20 +311,22 @@ Credit amount: `$103.01`
 
 Meaning:
 
-The order has multiple invoices and the payment/source mapping is not simple enough to repair automatically.
+The eBay order has multiple invoices, and the credit/payment relationship is not clear enough from the basic invoice link.
 
 Repair:
 
-Needs manual or scripted mapping from payout history/state to identify the correct invoice/payment.
+Use payout history or saved reconcile state to identify which invoice the credit belongs to, then repair that invoice.
 
 Example:
 
-- eBay order has invoices `IN100`, `IN101`, `IN102`.
-- Credit note exists, but source/payment relationship is unclear.
+- eBay order `01-12345-67890` has three invoices: `IN100`, `IN101`, `IN102`.
+- Credit note `IC200`: `$35`
+- Payment exists, but it is unclear which invoice should receive the credit.
 
-Question to resolve:
+Decision needed:
 
-Which invoice should receive the credit?
+- If payout history shows `IC200` was created against `IN101`, apply it to `IN101`.
+- If not, keep it out of automatic repair until accounting confirms the target.
 
 ### 10. `REVIEW_MISSING_SOURCE_MULTIPLE_INVOICES`
 
@@ -307,21 +335,24 @@ Credit amount: `$374.90`
 
 Meaning:
 
-The credit note has no source invoice link, and the order has multiple possible invoices.
+The credit note has no source invoice link, and the eBay order has more than one possible invoice. We cannot safely choose one without more information.
 
 Repair:
 
-Needs manual or scripted selection of the correct invoice.
+Use payout history, original reconcile state, or accounting review to choose the correct invoice. If no invoice can be confirmed, keep the credit available but unapplied.
 
 Example:
 
 - Credit note `IC200` for order `01-12345-67890`.
 - Invoices found: `IN100`, `IN101`.
 - No source invoice link on `IC200`.
+- Credit amount: `$120`
 
-Question to resolve:
+Possible outcomes:
 
-Should `IC200` apply to `IN100`, `IN101`, or remain standalone credit?
+- Apply `$120` to `IN100` if payout history confirms it.
+- Apply `$120` to `IN101` if payout history confirms it.
+- Leave `$120` as available credit if no invoice target can be proven.
 
 ### 11. `NO_ACTION_ALREADY_FIXED`
 
@@ -330,7 +361,7 @@ Credit amount: `$299.99`
 
 Meaning:
 
-The credit note already has a Dolibarr fixed discount/credit row.
+The credit note is already available/applied in Dolibarr. It does not need repair.
 
 Repair:
 
@@ -338,11 +369,15 @@ No repair should be applied.
 
 Example:
 
-- Credit note `IC200` already marked available and applied.
+- Credit note `IC200`: `$300`
+- It already has a Dolibarr credit/discount entry.
+- It is already applied to invoice `IN100`.
 
 After review:
 
 - Leave unchanged.
+- Do not reverse payment.
+- Do not apply the credit again.
 
 ## Recommended Next Step
 
