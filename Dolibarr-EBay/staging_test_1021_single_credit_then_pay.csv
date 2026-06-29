@@ -1,0 +1,7 @@
+"Seller ID","JKComputers"
+"Payout ID","STAGE-1021-SINGLE-09-14819-22344"
+"Payout date","06/29/2026"
+"Amount","1000.00 USD"
+"Transaction creation date","Type","Order number","Description","Gross transaction amount","Net amount","Payout date","Payout ID","Payout method"
+"06/29/2026","Order","09-14819-22344","Staging 1.0.21 single-order net payment test for invoice IN2606-6201","1299.99","1299.99","06/29/2026","STAGE-1021-SINGLE-09-14819-22344","Test Bank - *1021"
+"06/29/2026","Other fee","09-14819-22344","Staging 1.0.21 adjustment: create credit note then pay net","-299.99","-299.99","06/29/2026","STAGE-1021-SINGLE-09-14819-22344","Test Bank - *1021"
