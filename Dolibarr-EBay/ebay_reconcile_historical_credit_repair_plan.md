@@ -100,18 +100,22 @@ Repair:
 3. Apply the credit note to the invoice.
 4. Leave the invoice paid for the correct net amount.
 
-Example:
+Real staging example:
 
-- Invoice `IN100`: `$1,000`
-- Credit note `IC200`: `$150`
-- Payment currently recorded: `$1,000`
-- Correct payment should be: `$850`
+- eBay order: `01-14548-61803`
+- Invoice: `IN2604-1161`
+- Credit note: `IC2606-0735`
+- Payment: `PAY2604-0115`
+- Payout: `7462176191`
+- Invoice/payment currently recorded: `$140.86`
+- Module-created credit note amount: `$6.82`
+- Correct net payment should be: `$134.04`
 
 After repair:
 
 - The invoice is still paid.
-- The credit note reduces the invoice by `$150`.
-- The payment is corrected from `$1,000` to `$850`.
+- The credit note reduces the invoice by `$6.82`.
+- The payment is corrected from `$140.86` to `$134.04`.
 - Customer outstanding is not overstated or negative.
 
 ### 2. `REPAIR_USING_EXISTING_CN_SOURCE_INVOICE_IGNORE_ORDER_AMBIGUITY`
@@ -127,18 +131,22 @@ Repair:
 
 Use the invoice already linked on the credit note, apply the credit there, and adjust that invoice payment only.
 
-Example:
+Real staging example:
 
-- eBay order `01-12345-67890` has two invoices: `IN100` for `$600` and `IN101` for `$400`.
-- Credit note `IC200` for `$80` is already linked to `IN101`.
-- Payment on `IN101` was recorded as `$400`.
-- Correct payment on `IN101` should be `$320`.
+- eBay order: `02-14575-10487`
+- Possible invoices on the order: `IN2604-1578`, `IN2606-5520`
+- Credit note: `IC2606-0751`
+- Credit note amount: `$32.75`
+- Source invoice already stored on the credit note: `IN2604-1578`
+- Payment: `PAY2604-0131`
+- Payout: `7462176191`
+- Invoice/payment currently recorded on `IN2604-1578`: `$31.08`
 
 After repair:
 
-- `IC200` is applied to `IN101`.
-- Payment on `IN101` is corrected from `$400` to `$320`.
-- `IN100` is not touched.
+- `IC2606-0751` is applied to `IN2604-1578` because the credit note already points there.
+- `IN2606-5520` is not touched.
+- Since the credit is `$1.67` higher than the invoice/payment, the extra value should remain available credit instead of forcing a negative invoice balance.
 
 ### 3. `APPLY_CN_WITH_RESIDUAL_AVAILABLE_CREDIT`
 
@@ -155,17 +163,21 @@ Repair:
 2. Keep the remaining credit available on the customer account.
 3. Do not force the invoice or customer balance below zero.
 
-Example:
+Real staging example:
 
-- Invoice: `$100`
-- Payment recorded: `$100`
-- Credit note: `$130`
+- eBay order: `04-14600-08898`
+- Invoice: `IN2605-1899`
+- Credit note: `IC2606-0957`
+- Payment: `PAY2605-0379`
+- Payout: `7487039580`
+- Invoice/payment currently recorded: `$25.68`
+- Credit note amount: `$27.26`
 
 After repair:
 
-- `$100` of the credit is used against the invoice.
-- `$30` remains available as customer credit.
-- The invoice is not pushed to `-$30`.
+- `$25.68` of the credit is used against `IN2605-1899`.
+- `$1.58` remains available as customer credit.
+- The invoice is not pushed to `-$1.58`.
 
 ### 4. `MARK_CN_AVAILABLE_STANDALONE_NO_SOURCE_INVOICE`
 
@@ -180,15 +192,17 @@ Repair:
 
 Mark the credit note as available customer credit, but do not apply it to an invoice automatically.
 
-Example:
+Real staging example:
 
-- Credit note `IC200`: `$75`
-- No source invoice found.
-- There is no safe invoice target.
+- eBay order: `02-14459-65870`
+- Credit note: `IC2606-0913`
+- Credit note amount: `$50.61`
+- Source invoice found: none
+- Payment to adjust: none safely identified
 
 After repair:
 
-- `IC200` becomes available credit on the eBay customer account.
+- `IC2606-0913` becomes available credit on the eBay customer account.
 - Accounting can later apply, clear, or review it.
 - No payment is changed automatically.
 
@@ -205,18 +219,21 @@ Repair:
 
 Add the credit notes together, apply them all to the invoice, and correct the payment by the combined credit amount.
 
-Example:
+Real staging example:
 
-- Invoice `IN100`: `$1,000`
-- Credit notes: `IC201 = $50`, `IC202 = $75`
-- Payment currently recorded: `$1,000`
-- Total credits: `$125`
-- Correct payment should be `$875`.
+- eBay order: `03-14545-96631`
+- Invoice: `IN2604-1181`
+- Credit notes: `IC2606-0752` and `IC2606-1774`
+- Payment: `PAY2604-0132`
+- Payout: `7462176191`
+- Invoice/payment currently recorded: `$6.78`
+- Combined credit note amount: `$6.70`
+- Correct net payment should be: `$0.08`
 
 After repair:
 
-- Apply both credit notes to `IN100`.
-- Payment is corrected from `$1,000` to `$875`.
+- Apply both credit notes to `IN2604-1181`.
+- Payment is corrected from `$6.78` to `$0.08`.
 - Invoice remains paid correctly.
 
 ### 6. `RELINK_CN_TO_ONLY_ORDER_INVOICE_THEN_REPAIR`
@@ -235,19 +252,19 @@ Repair:
 3. Apply it to that invoice.
 4. Adjust payment if needed.
 
-Example:
+Real staging example:
 
-- eBay order `01-12345-67890`
-- One invoice found: `IN100`
-- Credit note `IC200`: `$40`
-- Payment currently recorded on `IN100`: `$500`
-- Correct payment should be `$460`.
+- eBay order: `10-14561-27101`
+- Credit note: `IC2606-0945`
+- Credit note amount: `$4.88`
+- Source invoice on the credit note: missing
+- Only invoice found for the order: `IN2606-5556`
 
 After repair:
 
-- Treat `IN100` as the source invoice.
-- Apply `IC200` to `IN100`.
-- Correct the invoice payment to the net amount.
+- Treat `IN2606-5556` as the source invoice because it is the only invoice for that order.
+- Apply `IC2606-0945` to `IN2606-5556`.
+- If that invoice has an over-recorded payment, correct the payment to the net amount.
 
 ### 7. `MARK_APPLY_CN_NO_PAYMENT_REVERSAL`
 
@@ -262,16 +279,19 @@ Repair:
 
 Mark the credit note available and apply it to the source invoice. Leave payments alone.
 
-Example:
+Real staging example:
 
-- Invoice `IN100`: `$500`
-- Payment recorded: `$0`
-- Credit note `IC200`: `$50`
+- eBay order: `05-14496-55088`
+- Invoice: `IN2604-0640`
+- Credit note: `IC2606-1370`
+- Invoice amount: `$267.89`
+- Credit note amount: `$261.53`
+- Payment recorded: none
 
 After repair:
 
-- Apply `$50` credit to invoice.
-- Invoice open balance becomes `$450`.
+- Apply `$261.53` credit to `IN2604-0640`.
+- Invoice open balance becomes `$6.36`.
 - No payment record is changed.
 
 ### 8. `GROUPED_CN_REVIEW_PAYMENT_SHORT_OR_COMPLEX`
@@ -287,22 +307,26 @@ Repair:
 
 Use a scripted rule or accounting decision to decide how much credit can be applied and how much should remain available.
 
-Example:
+Real staging example:
 
-- Invoice `IN100`: `$300`
-- Credit notes total: `$400`
-- Payment recorded: `$250`
+- eBay order: `01-14560-63539`
+- Invoice: `IN2604-1360`
+- Credit notes: `IC2606-0738` and `IC2606-1593`
+- Payment: `PAY2604-0118`
+- Payout: `7462176191`
+- Invoice/payment currently recorded: `$63.32`
+- Combined credit note amount: `$67.36`
 
 Why this needs a decision:
 
-- The credit is larger than the invoice/payment situation.
+- The combined credit is `$4.04` higher than the payment/invoice amount in this group.
 - We can apply up to the invoice amount, but there may be leftover credit.
-- We need to decide whether the extra `$100` is valid available credit or whether one credit note is duplicate.
+- We need to decide whether the extra `$4.04` is valid available credit or whether one credit note is duplicate.
 
 Possible after repair:
 
-- `$300` credit is applied to close the invoice.
-- `$100` stays as available credit, if accounting confirms it is valid.
+- `$63.32` credit is applied to close the invoice.
+- `$4.04` stays as available credit, if accounting confirms it is valid.
 
 ### 9. `REVIEW_AMBIGUOUS_ORDER_AND_COMPLEX_PAYMENT`
 
@@ -317,16 +341,21 @@ Repair:
 
 Use payout history or saved reconcile state to identify which invoice the credit belongs to, then repair that invoice.
 
-Example:
+Real staging example:
 
-- eBay order `01-12345-67890` has three invoices: `IN100`, `IN101`, `IN102`.
-- Credit note `IC200`: `$35`
-- Payment exists, but it is unclear which invoice should receive the credit.
+- eBay order: `21-14465-88754`
+- Possible invoices on the order: `IN2604-0516`, `IN2605-2676`
+- Credit notes in the group: `IC2606-1160` for `$20.75`, `IC2606-1694` for `$33.54`
+- Combined credit note amount: `$54.29`
+- Source invoice shown in the report: `IN2604-0516`
+- Invoice amount: `$784.55`
+- Simple payment line in the report: none
 
 Decision needed:
 
-- If payout history shows `IC200` was created against `IN101`, apply it to `IN101`.
-- If not, keep it out of automatic repair until accounting confirms the target.
+- Confirm from payout history or saved reconcile state whether these credits belong to `IN2604-0516`.
+- If confirmed, repair `IN2604-0516`.
+- If not confirmed, keep it out of automatic repair until accounting confirms the target.
 
 ### 10. `REVIEW_MISSING_SOURCE_MULTIPLE_INVOICES`
 
@@ -341,18 +370,19 @@ Repair:
 
 Use payout history, original reconcile state, or accounting review to choose the correct invoice. If no invoice can be confirmed, keep the credit available but unapplied.
 
-Example:
+Real staging example:
 
-- Credit note `IC200` for order `01-12345-67890`.
-- Invoices found: `IN100`, `IN101`.
-- No source invoice link on `IC200`.
-- Credit amount: `$120`
+- eBay order: `(no order #)`
+- Credit note: `IC2606-0992`
+- Credit note amount: `$74.95`
+- Possible invoices found: `IN2606-5451`, `IN2606-5855`, `IN2606-5903`, `IN2606-5912`
+- No source invoice link on `IC2606-0992`.
+- No single invoice target can be proven from the credit note itself.
 
 Possible outcomes:
 
-- Apply `$120` to `IN100` if payout history confirms it.
-- Apply `$120` to `IN101` if payout history confirms it.
-- Leave `$120` as available credit if no invoice target can be proven.
+- Apply `$74.95` to the correct invoice if payout history confirms it.
+- Leave `$74.95` as available credit if no invoice target can be proven.
 
 ### 11. `NO_ACTION_ALREADY_FIXED`
 
@@ -367,11 +397,16 @@ Repair:
 
 No repair should be applied.
 
-Example:
+Real staging example:
 
-- Credit note `IC200`: `$300`
-- It already has a Dolibarr credit/discount entry.
-- It is already applied to invoice `IN100`.
+- eBay order: `09-14819-22344`
+- Invoice: `IN2606-6201`
+- Credit note: `IC2606-2838`
+- Payment: `PAY2606-3157`
+- Payout: `STAGE-1021-SINGLE-09-14819-22344`
+- Payment amount: `$1,000.00`
+- Credit note amount: `$299.99`
+- The credit note already has the Dolibarr fixed discount/credit row.
 
 After review:
 
