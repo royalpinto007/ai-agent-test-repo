@@ -487,7 +487,9 @@ def run(session_id, issue_title, issue_description, repo_path, branch_name=None,
     )
     if commit_result.returncode != 0 and not any(b in _commit_out for b in _benign_commit):
         raise RuntimeError(f"git commit failed: {_commit_out.strip()}")
-    run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
+    # force-with-lease: a redo rebuilds the branch off main, so it diverges from a
+    # prior run's already-pushed branch (plain push → non-fast-forward reject).
+    run_git(["push", "-u", "--force-with-lease", "origin", branch_name], cwd=repo_path)
 
     if failed_edits:
         note = ("\n\n---\n### ⚠️ Edits the agent could not auto-apply\n"
@@ -762,7 +764,11 @@ def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_n
     _benign = ("nothing to commit", "no changes added to commit", "nothing added to commit")
     if commit_result.returncode != 0 and not any(b in _commit_out for b in _benign):
         raise RuntimeError(f"git commit failed: {_commit_out.strip()}")
-    run_git(["push", "-u", "origin", branch_name], cwd=repo_path)
+    # Each (re)run rebuilds the branch fresh off main, so a redo diverges from the
+    # branch a prior run already pushed → a plain push is a non-fast-forward reject.
+    # force-with-lease overwrites our own stale remote branch while still refusing
+    # to clobber unrelated concurrent updates.
+    run_git(["push", "-u", "--force-with-lease", "origin", branch_name], cwd=repo_path)
 
     issue_number = session_id.split("-")[-1] if "-" in session_id else None
     pr_url = pr_error = None
