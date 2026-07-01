@@ -169,10 +169,12 @@ How to build (in this order):
 3. Refine with the incremental tools where needed: `aimodulebuilder_add_object`, `aimodulebuilder_add_field`, `aimodulebuilder_init_object_page`, and `aimodulebuilder_write_file`/`aimodulebuilder_read_file` for hand-tuning generated files (e.g. business rules, a real README).
 4. The real MCP tool names are prefixed **`aimodulebuilder_`**. There is NO `amb_*` tool — never call one. If unsure of an exact name, call `aimodulebuilder_native_actions`.
 
-Quality bar (verify before finishing):
+Keep it a CLEAN generated module (this is where past runs went wrong):
+- **Let the generator own the schema and the object class.** Define every table/field ONLY through `aimodulebuilder_add_object` / `aimodulebuilder_add_field`. Do NOT hand-write any `sql/llx_*.sql`, do NOT change the object's generated `$table_element` or table name (the MCP names it `<module_key>_<object>`, e.g. `llx_maintenancelog_maintenancelog` — leave it), and do NOT introduce a second bare `llx_<module_key>` table. The reference modules `preopportunity`/`qualitymanagement` are pure generator output — match them.
+- **Never hand-overwrite the generated object class with `aimodulebuilder_write_file`.** Add fields ONE AT A TIME (sequential calls, not parallel) to avoid the generator's concurrent-write race. If the class does get corrupted, recover with `aimodulebuilder_regenerate_module` — do NOT rewrite the class by hand (that desyncs the class from the generated SQL). Use `aimodulebuilder_write_file` only to add a business METHOD to the class body, never to redefine `$fields`/`$table_element`/the table.
+- **No `uninstall.sql`.** The native template does not emit one and the reference modules have none — do not create `sql/uninstall.sql` or `sql/llx_*.uninstall.sql` (the latter is a `DROP TABLE` auto-run on ENABLE). Uninstall is handled by Dolibarr's module deactivation, not a SQL file.
 - **Real README** — replace any generated `MYMODULE` / "Description of the module..." boilerplate with a real description of THIS module.
-- **Numbering:** if the object has reference auto-numbering, set `module_parts['models'] => 1` in the descriptor (via `aimodulebuilder_write_file` if the generator didn't), else refs stay `(PROV…)`.
-- **Uninstall SQL must be named plain `uninstall.sql`** (NOT `llx_<mod>.uninstall.sql`) — a `DROP TABLE` in an `llx_`-prefixed file is auto-run by `_load_tables()` on ENABLE and drops the table on install. If the generator emitted an `llx_*.uninstall.sql`, rename/rewrite it to `uninstall.sql`.
+- **Numbering:** if the object has reference auto-numbering, set `module_parts['models'] => 1` in the descriptor (via `aimodulebuilder_write_file` on the descriptor only), else refs stay `(PROV…)`.
 
 Do NOT run any git commands (no add/commit/push/checkout/branch) — the pipeline versions `{module_dir}` and opens the PR. Do not enable the module or start servers.
 

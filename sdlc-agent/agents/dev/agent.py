@@ -565,8 +565,8 @@ def _harvest_module(module_dir, repo_path):
     """Copy the MCP-generated module (htdocs/custom/<key>) into the git clone so
     the working-tree diff IS the new module. Mirrors module_dir exactly except the
     clone's own .git. Also normalizes the footgun uninstall filename: an
-    `llx_*.uninstall.sql` is auto-run by _load_tables() on ENABLE (DROP on install)
-    — rename it to plain `uninstall.sql`, which _load_tables skips."""
+    A clean MCP-generated module has no uninstall SQL, so any uninstall*.sql (a
+    hand-scaffold leftover / the ENABLE-time DROP footgun) is dropped here."""
     import os as _os, shutil as _sh, glob as _glob
     if not module_dir or not _os.path.isdir(module_dir):
         return  # MCP produced nothing — leave the clone empty; caller reports it
@@ -579,11 +579,12 @@ def _harvest_module(module_dir, repo_path):
     for entry in _os.listdir(module_dir):
         src, dst = _os.path.join(module_dir, entry), _os.path.join(repo_path, entry)
         _sh.copytree(src, dst) if _os.path.isdir(src) else _sh.copy2(src, dst)
-    # footgun guard: llx_<mod>.uninstall.sql -> uninstall.sql
-    for f in _glob.glob(_os.path.join(repo_path, "sql", "llx_*uninstall*.sql")):
-        dest = _os.path.join(_os.path.dirname(f), "uninstall.sql")
-        if not _os.path.exists(dest):
-            _os.rename(f, dest)
+    # A clean MCP-generated module (see preopportunity/qualitymanagement) has NO
+    # uninstall SQL at all — the native template never emits one. Any uninstall*.sql
+    # here is a hand-scaffold leftover (and an `llx_*.uninstall.sql` is the ENABLE-time
+    # DROP footgun). Drop them all so the harvested module matches the reference shape.
+    for f in _glob.glob(_os.path.join(repo_path, "sql", "*uninstall*.sql")):
+        _os.remove(f)
 
 
 def _changed_paths(repo_path):
