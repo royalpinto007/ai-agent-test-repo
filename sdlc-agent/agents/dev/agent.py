@@ -6,7 +6,7 @@ from shared.utils import get_file_tree, read_file, write_file, run_git, run_test
 from shared.session import save_session, load_session
 from agents.dev.prompts import (
     codebase_understanding_prompt, implementation_prompt, retry_prompt, redo_prompt,
-    agentic_implementation_prompt, agentic_retry_prompt,
+    agentic_implementation_prompt, agentic_retry_prompt, agentic_new_module_prompt,
 )
 
 MAX_RETRIES = 3
@@ -542,6 +542,48 @@ def _is_agentic(target_repo):
     return target_repo.get("dev_mode") == "agentic" or bool(target_repo.get("skill"))
 
 
+def _os_basename(p):
+    import os as _os
+    return _os.path.basename(_os.path.normpath(p))
+
+
+def _ensure_absent(module_dir):
+    """The AI Module Builder create endpoint refuses a pre-existing module dir, so
+    clear any leftover (unmounting first if a prior run bind-mounted it) so the MCP
+    scaffolds fresh."""
+    import os as _os, shutil as _sh
+    if not module_dir or not _os.path.isdir(module_dir):
+        return
+    if subprocess.run(["mountpoint", "-q", module_dir]).returncode == 0:
+        subprocess.run(["umount", module_dir])
+    _sh.rmtree(module_dir, ignore_errors=True)
+
+
+def _harvest_module(module_dir, repo_path):
+    """Copy the MCP-generated module (htdocs/custom/<key>) into the git clone so
+    the working-tree diff IS the new module. Mirrors module_dir exactly except the
+    clone's own .git. Also normalizes the footgun uninstall filename: an
+    `llx_*.uninstall.sql` is auto-run by _load_tables() on ENABLE (DROP on install)
+    — rename it to plain `uninstall.sql`, which _load_tables skips."""
+    import os as _os, shutil as _sh, glob as _glob
+    if not module_dir or not _os.path.isdir(module_dir):
+        return  # MCP produced nothing — leave the clone empty; caller reports it
+    # wipe everything in the clone except .git, then copy the module in
+    for entry in _os.listdir(repo_path):
+        if entry == ".git":
+            continue
+        path = _os.path.join(repo_path, entry)
+        _sh.rmtree(path) if _os.path.isdir(path) and not _os.path.islink(path) else _os.remove(path)
+    for entry in _os.listdir(module_dir):
+        src, dst = _os.path.join(module_dir, entry), _os.path.join(repo_path, entry)
+        _sh.copytree(src, dst) if _os.path.isdir(src) else _sh.copy2(src, dst)
+    # footgun guard: llx_<mod>.uninstall.sql -> uninstall.sql
+    for f in _glob.glob(_os.path.join(repo_path, "sql", "llx_*uninstall*.sql")):
+        dest = _os.path.join(_os.path.dirname(f), "uninstall.sql")
+        if not _os.path.exists(dest):
+            _os.rename(f, dest)
+
+
 def _changed_paths(repo_path):
     """Files modified/added in the working tree (the agent's edits), from
     `git status --porcelain`. Handles renames (takes the new path).
@@ -620,6 +662,12 @@ def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_n
     extra_dirs = [d for d in [target_repo.get("dol_htdocs")] if d]
     mcp_config = target_repo.get("mcp_config") or None
 
+    # New-module builds go through the AI Module Builder MCP, which generates into
+    # a FRESH htdocs/custom/<key> dir (it refuses a pre-existing one). We then
+    # harvest that dir into the git clone and open the PR from the clone's diff.
+    new_module = bool(target_repo.get("create"))
+    module_dir = target_repo.get("module_dir")
+
     # Fresh branch off main so the working-tree diff IS the change.
     run_git(["checkout", main_branch], cwd=repo_path)
     run_git(["pull"], cwd=repo_path)
@@ -629,8 +677,21 @@ def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_n
         pass
     run_git(["checkout", "-b", branch_name], cwd=repo_path)
 
-    prompt = agentic_implementation_prompt(issue_title, issue_description, pm_tasks, redo_instructions)
-    output = ask_claude_agentic(prompt, cwd=repo_path, mcp_config=mcp_config, extra_dirs=extra_dirs)
+    if new_module and module_dir:
+        module_key = target_repo.get("module_key") or _os_basename(module_dir)
+        _ensure_absent(module_dir)  # the MCP create endpoint refuses an existing dir
+        prompt = agentic_new_module_prompt(issue_title, issue_description, module_key,
+                                           module_dir, pm_tasks, redo_instructions)
+        # The builder generates into htdocs/custom/<key>, so the agent needs the
+        # htdocs tree available; cwd is the clone (no git ops run there yet).
+        run_ctx = {"cwd": repo_path, "mcp_config": mcp_config,
+                   "extra_dirs": list({*extra_dirs, module_dir})}
+        output = ask_claude_agentic(prompt, **run_ctx)
+        _harvest_module(module_dir, repo_path)  # copy MCP output into the clone
+    else:
+        run_ctx = {"cwd": repo_path, "mcp_config": mcp_config, "extra_dirs": extra_dirs}
+        prompt = agentic_implementation_prompt(issue_title, issue_description, pm_tasks, redo_instructions)
+        output = ask_claude_agentic(prompt, **run_ctx)
 
     changed = _changed_paths(repo_path)
     attempts = 1
@@ -655,10 +716,7 @@ def _run_agentic(session_id, issue_title, issue_description, repo_path, branch_n
 
     # One agentic retry on test failure — let the skill self-correct in place.
     if changed and not test_passed and MAX_RETRIES > 1:
-        output = ask_claude_agentic(
-            agentic_retry_prompt(issue_title, test_output),
-            cwd=repo_path, mcp_config=mcp_config, extra_dirs=extra_dirs,
-        )
+        output = ask_claude_agentic(agentic_retry_prompt(issue_title, test_output), **run_ctx)
         attempts += 1
         changed = _changed_paths(repo_path)
         if changed:

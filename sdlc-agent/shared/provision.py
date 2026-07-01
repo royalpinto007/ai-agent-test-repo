@@ -128,29 +128,29 @@ def provision_module(target_repo, token):
         _run(["git", "config", "--global", "--add", "safe.directory", repo_path])
         log.warning("provision: cloned %s -> %s", name, repo_path)
 
-    # 3) bind-mount into the live htdocs/custom + make web-writable (best effort)
+    # 3) MCP-native scaffolding target. The AI Module Builder create endpoint
+    #    (aimodulebuilder_create_module) REFUSES to run if htdocs/custom/<module>
+    #    already exists, so we must NOT bind-mount the (already-populated) clone
+    #    there. Instead we hand the builder a FRESH path: record module_dir +
+    #    module_key, make htdocs/custom writable by the web user, and clear any
+    #    stale dir left by a previous hand-scaffold/failed run. The Dev stage
+    #    lets the MCP generate into module_dir, then harvests it into the clone.
     htdocs = target_repo.get("dol_htdocs") or os.environ.get("DOL_HTDOCS", "").strip()
     if htdocs:
-        mnt = os.path.join(htdocs, "custom", module)
-        is_mounted = os.path.isdir(mnt) and _run(["mountpoint", "-q", mnt]).returncode == 0
-        if not is_mounted:
-            os.makedirs(mnt, exist_ok=True)
-            mr = _run(["mount", "--bind", repo_path, mnt])
-            if mr.returncode != 0:
-                log.warning("provision: bind-mount failed (%s) — live amb_* won't see the module; "
-                            "agent will hand-scaffold into the repo instead.", mr.stderr.strip()[:200])
-            else:
-                try:
-                    with open("/etc/fstab") as f:
-                        fstab = f.read()
-                    if repo_path not in fstab:
-                        with open("/etc/fstab", "a") as f:
-                            f.write(f"{repo_path} {mnt} none bind 0 0\n")
-                except Exception as e:
-                    log.warning("provision: could not update fstab: %s", e)
-        # let the web user (amb_*/REST scaffolder) write into the module
-        _run(["chgrp", "-R", "www-data", repo_path])
-        _run(["bash", "-c", f"chmod -R g+rwX {repo_path!r} && find {repo_path!r} -type d -exec chmod g+s {{}} +"])
+        custom = os.path.join(htdocs, "custom")
+        module_dir = os.path.join(custom, module)
+        target_repo["module_dir"] = module_dir
+        target_repo["module_key"] = module
+        # custom/ must be writable by the web user so the builder can create the dir
+        _run(["chgrp", "www-data", custom])
+        _run(["bash", "-c", f"chmod g+rwxs {custom!r}"])
+        # clear a stale module dir (unmount first if a prior run bind-mounted it)
+        if os.path.isdir(module_dir):
+            if _run(["mountpoint", "-q", module_dir]).returncode == 0:
+                _run(["umount", module_dir])
+            import shutil as _sh
+            _sh.rmtree(module_dir, ignore_errors=True)
+            log.warning("provision: cleared stale module dir %s so the MCP can create it fresh", module_dir)
 
     # 4) register in repos.json so every stage resolves it
     _register(target_repo["slug"], target_repo)

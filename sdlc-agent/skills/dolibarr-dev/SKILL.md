@@ -1,7 +1,7 @@
 ---
 name: dolibarr-dev
 description: Develop custom Dolibarr modules end-to-end — scaffold/modify modules, fields, tables, pages, permissions, menus, hooks and triggers, admin/setup pages, config constants, and third-party API integrations (e.g. carrier/payment REST APIs) — by reading the existing Dolibarr core/custom code and DB first, then building by mirroring it. Use whenever the request is to create/build/extend a Dolibarr custom module, add a hook or trigger, add or change a field/table/page/menu/permission, integrate an external API, read or write a module config constant, or find the exact hook context / hook method / trigger action-code name from the codebase.
-when_to_use: Triggers on Dolibarr module development, "create a module", "add a field/table/page/menu/permission", "add an extrafield / extra attribute on an order/invoice/product", "add or remove a field LATER / alter table / change the schema", "add a hook", "add a trigger", "which trigger fires when X", "what hook context does page Y use", "write some logic/business rule in Dolibarr", "plan this feature / design before building / what's the best approach in Dolibarr", "think through all the scenarios / what could break / what am I missing", "build a feature for sales/finance/warehouse/manufacturing/logistics users", "proposal/order/invoice/shipment/stock logic", "integrate FedEx/UPS/Stripe/<any> API", "store/read a module setting", "add an admin/setup page", "security review / is this module safe / fix SQL injection or XSS or CSRF", "reuse existing functions instead of rewriting", "find and remove dead/unused code", "test the business flow end-to-end before confirming", "what did we build in this module before / what was the requirement", "why isn't my change showing", "where are the logs", scaffolding under htdocs/custom, or any work involving amb_* (Advance Module Builder) tools, actions_*.class.php hook handlers, core/triggers/interface_*.class.php files, or lib/*.lib.php helpers.
+when_to_use: Triggers on Dolibarr module development, "create a module", "add a field/table/page/menu/permission", "add an extrafield / extra attribute on an order/invoice/product", "add or remove a field LATER / alter table / change the schema", "add a hook", "add a trigger", "which trigger fires when X", "what hook context does page Y use", "write some logic/business rule in Dolibarr", "plan this feature / design before building / what's the best approach in Dolibarr", "think through all the scenarios / what could break / what am I missing", "build a feature for sales/finance/warehouse/manufacturing/logistics users", "proposal/order/invoice/shipment/stock logic", "integrate FedEx/UPS/Stripe/<any> API", "store/read a module setting", "add an admin/setup page", "security review / is this module safe / fix SQL injection or XSS or CSRF", "reuse existing functions instead of rewriting", "find and remove dead/unused code", "test the business flow end-to-end before confirming", "what did we build in this module before / what was the requirement", "why isn't my change showing", "where are the logs", scaffolding under htdocs/custom, or any work involving aimodulebuilder_* (Advance Module Builder) tools, actions_*.class.php hook handlers, core/triggers/interface_*.class.php files, or lib/*.lib.php helpers.
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, mcp__dolibarr_expert
 ---
 
@@ -20,24 +20,30 @@ tool — inspect or verify any file by reading it straight off disk with
 
 ## Two ways to build — scaffold via the Module Builder, hand-write the rest
 
-1. **`amb_*` Module Builder MCP tools** (server `dolibarr_expert`) — the PREFERRED
-   way to SCAFFOLD a new module or a standard object/field/page. Use
-   `amb_init_module`, `amb_add_object`, `amb_add_field`, `amb_add_extrafields`,
-   etc.: they generate the descriptor, object class, `sql/llx_*.sql`, card/list,
-   menus and numbering wiring as proper standard files, edited on disk directly
-   (no manifest/regenerate step). When the task is "create a module" or "add an
-   object/field/table to a module", **drive it through `amb_*`** — do NOT hand-write
-   the skeleton. This is what routes module builds through the MCP.
-   ⚠️ Only if an `amb_*` call genuinely fails (e.g. HTTP 501 endpoint unavailable,
-   or a permission error like `modulebuilder->run`) do you fall back to
-   hand-scaffolding by mirroring an existing custom module — and **say so explicitly**
-   in your report (which tool failed and why). The hand-scaffold output is the same
-   standard files.
+1. **`aimodulebuilder_*` Module Builder MCP tools** (server `dolibarr_expert`) — the PREFERRED
+   way to SCAFFOLD a new module or a standard object/field/page. The tool names are
+   prefixed **`aimodulebuilder_`** — there is NO `amb_*` tool; never call one. Start with
+   `aimodulebuilder_status` (confirm the builder API is installed/ready) and, if unsure of an
+   exact name, `aimodulebuilder_native_actions`. To build a whole new module use
+   `aimodulebuilder_create_module` (pass a JSON manifest: `module_name`, `module_key`,
+   `description`, `menu_title`, `tables`[with `fields`], `features`/`permissions`/`menus`/`pages`);
+   to extend one use `aimodulebuilder_add_object`, `aimodulebuilder_add_field`,
+   `aimodulebuilder_update_field`, `aimodulebuilder_init_part`, `aimodulebuilder_init_object_page`,
+   and `aimodulebuilder_write_file`/`aimodulebuilder_read_file` to refine generated files. They
+   generate the descriptor, object class, `sql/llx_*.sql`, card/list, menus and numbering wiring
+   as proper standard files. When the task is "create a module" or "add an object/field/table to a
+   module", **drive it through `aimodulebuilder_*`** — do NOT hand-write the skeleton. This is what
+   routes module builds through the MCP.
+   ⚠️ `aimodulebuilder_create_module` REFUSES to run if `htdocs/custom/<module_key>` already exists
+   ("Module directory already exists") — for a brand-new module the pipeline hands you a fresh path,
+   so don't pre-create it. Only if an `aimodulebuilder_*` call genuinely fails (endpoint unavailable,
+   permission error like `modulebuilder->run`) do you fall back to hand-scaffolding by mirroring an
+   existing custom module — and **say so explicitly** in your report (which tool failed and why).
 2. **Hand-write PHP/SQL that mirrors core** — for everything that is NOT standard
    scaffolding: edits to existing files, hook handlers, triggers, business logic,
    admin/setup pages, lib helpers, API integrations, and any non-standard code.
    You have `Read`/`Edit`/`Write` and `Bash`; use them directly, mirroring a
-   concrete working example. (Also the documented fallback when `amb_*` is down.)
+   concrete working example. (Also the documented fallback when `aimodulebuilder_*` is down.)
 
 Bundled helpers (call via `${CLAUDE_SKILL_DIR}/scripts/...`):
 - `scan-code.sh` — extract hook contexts, hook method points, trigger action
@@ -79,7 +85,7 @@ This skill reads a lot (LEARNINGS, scans, schema, large class files). Keep the c
    and reconstruct purpose from the code + `git log` (and ask the user). Treat the
    brain as intent, not truth: confirm any claim against the live code.
 1. List what exists: `bash ${CLAUDE_SKILL_DIR}/scripts/scan-code.sh modules` (or
-   `amb_list_modules`). Read the target module's descriptor + classes on disk
+   `aimodulebuilder_list_modules`). Read the target module's descriptor + classes on disk
    (`htdocs/custom/<module>/core/modules/mod*.class.php`, `class/`, `sql/`).
 2. Read the DB schema you'll touch:
    - `bash ${CLAUDE_SKILL_DIR}/scripts/dol-db.sh modules`
@@ -227,8 +233,8 @@ register the module. Key properties (mirror an existing one):
 add a self-healing `ensureSchema()` that `SHOW TABLES LIKE` checks then `CREATE
 TABLE` once (guard with a `static $done`).
 
-**Path B — `amb_*` structured tools:** `amb_add_object` (creates class + SQL +
-card/list/menus), then `amb_add_field` / `amb_edit_field` / `amb_delete_field`
+**Path B — `aimodulebuilder_*` structured tools:** `aimodulebuilder_add_object` (creates class + SQL +
+card/list/menus), then `aimodulebuilder_add_field` / `aimodulebuilder_update_field` / `aimodulebuilder_delete_field`
 (each takes a `field` object: name, label, type required + optional visible,
 enabled, position, notnull, index, default, arrayofkeyval, searchall, css…).
 These rewrite the object class `$fields` array **and** `sql/llx_<table>.sql`.
@@ -259,7 +265,7 @@ object's card/list and includes them in search, with **zero custom UI**.
   signal you actually need a table (the multi-box packages are per-shipment repeating
   data → a JSON request field / table, not 4 extrafields).
 - **Declare them** in the descriptor (so activation seeds them) or via the
-  structured tool `amb_add_extrafields` (writes the definition); each has
+  structured tool `aimodulebuilder_add_field` (writes the definition); each has
   `name`, `label`, `type` (varchar/int/double/date/datetime/boolean/text/price/
   select/sellist/link/…), `size`, `pos`, `list`, `totalizable`, and for select/
   sellist an `param`/`arrayofkeyval`. Mirror an existing module's extrafield seeding.
@@ -332,7 +338,7 @@ Then read the page that fires the context (e.g. `commande/card.php`) to see the
 exact `initHooks(array(...))` context, which `executeHooks(...)` points it exposes,
 and what `$object`/`$parameters` you get.
 
-To add a hook: scaffold the handler (`amb_init_part` part `hook`, or hand-create
+To add a hook: scaffold the handler (`aimodulebuilder_init_part` part `hook`, or hand-create
 `actions_<module>.class.php` mirroring an existing one) → register the context(s)
 in the descriptor `module_parts['hooks']` → implement the chosen method point(s) →
 re-read on disk → load the page to confirm it fires.
@@ -363,7 +369,7 @@ bash ${CLAUDE_SKILL_DIR}/scripts/scan-code.sh find ORDER_REOPEN     # where it i
 ```
 Reading the firing site also tells you what `$object` is at trigger time.
 
-To add a trigger: scaffold (`amb_init_part` part `trigger`, or hand-create the
+To add a trigger: scaffold (`aimodulebuilder_init_part` part `trigger`, or hand-create the
 `interface_NN_mod<Module>_*.class.php`) → implement the `switch ($action)` →
 re-read on disk → fire the event in the app and check the log.
 
@@ -505,10 +511,10 @@ pages, and dangerous sinks. Hits are advisory — review and fix or justify each
 
 ## Destructive operations — confirm with the user FIRST
 
-`amb_delete_module`, `amb_delete_object`, `amb_delete_field`, `amb_drop_table`,
-`amb_delete_dictionary`, `amb_delete_permission`, `amb_delete_menu`,
-`amb_delete_file`, and any hand-written `DROP`/`DELETE`/`ALTER ... DROP`. Deleting a
-field or table **drops live data**. Use `amb_save_file` for edits the structured
+`aimodulebuilder_delete_module`, `aimodulebuilder_delete_object`, `aimodulebuilder_delete_field`, `aimodulebuilder_delete_object`,
+`aimodulebuilder_delete_section_item`, `aimodulebuilder_delete_permission`, `aimodulebuilder_delete_section_item`,
+`aimodulebuilder_delete_file`, and any hand-written `DROP`/`DELETE`/`ALTER ... DROP`. Deleting a
+field or table **drops live data**. Use `aimodulebuilder_write_file` for edits the structured
 tools can't express (it keeps a `.back` copy).
 
 ---
